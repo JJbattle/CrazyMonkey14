@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>拖拉机（升级）</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="info-bar">
+      <div class="info-item" id="dealer-info">坐庄：你（你方）</div>
+      <div class="info-item" id="level-info">本局打：2</div>
+      <div class="info-item" id="trump-info">主牌：未定</div>
+      <div class="info-item toggle" id="hurdle-info">5/10/K 必打：开</div>
+      <!-- 操作提示（轮到你出牌 / 扣底 / 发牌中…）放这：必打和重开之间 -->
+      <div id="status"></div>
+      <!-- 重开：放在顶栏最右边。以前藏在战报栏里，战报一收起就找不着了 -->
+      <button id="restart">重开</button>
+    </div>
+
+    <div id="body">
+      <!-- 上方 60%：牌桌（对手的牌 + 出牌区）在左，战报在右 -->
+      <div id="main">
+        <div id="table">
+          <!-- 对家（座位 2）的头像+牌堆+张数。**贴在牌桌左上角，浮着的**——
+               它是 absolute，不占文档流，所以出牌区一点地方都没被它吃掉。
+               以前它在牌桌顶上单占一整行（40 多像素高），把出牌区压得长不大；
+               后来搬进过顶栏，可那毕竟不在牌桌上了，看着别扭，又挪回牌桌里。 -->
+          <div id="seat-top" class="seat">
+            <div class="seat-head">
+              <div class="avatar" id="avatar-2"></div>
+              <div class="seat-name" id="name-2">对家</div>
+            </div>
+            <div class="seat-cards" id="cards-top"></div>
+            <div class="bubble" id="bubble-2"></div>
+          </div>
+          <!-- 右上角那一块「浮着说话」的地方：拖拉机/甩牌的大招牌 + 甩牌失败的红条。
+               都挂在这个角落的框里，往下叠着排，互相不会压住，
+               而且**一律不碰牌桌中间**——以前这俩都摆在屏幕正中，
+               一出拖拉机或者一甩牌失败就把牌面糊住了。 -->
+          <div id="corner">
+            <div id="flourish"></div>
+            <div id="banner"></div>
+          </div>
+          <!-- 每局结算：结算文字 + 各家嘴炮，统一摆在「玩家上方」这块空位，
+               竖着排，谁都不压谁。以前结算在左上角、嘴炮挂三个座位气泡，
+               北家（上）西家（左）的气泡会盖到一块。 -->
+          <div id="round-result"></div>
+          <div id="middle">
+            <div id="seat-left" class="seat side">
+              <div class="seat-head">
+                <div class="avatar" id="avatar-3"></div>
+                <div class="seat-name" id="name-3">上家</div>
+                <div class="bubble" id="bubble-3"></div>
+              </div>
+              <div class="seat-cards" id="cards-left"></div>
+            </div>
+            <div id="center">
+              <!-- 出牌区：中间是牌堆区（含本局得分），四边按方位摆各家出的牌 -->
+              <div id="trick"></div>
+            </div>
+            <div id="seat-right" class="seat side">
+              <div class="seat-head">
+                <div class="avatar" id="avatar-1"></div>
+                <div class="seat-name" id="name-1">下家</div>
+                <div class="bubble" id="bubble-1"></div>
+              </div>
+              <div class="seat-cards" id="cards-right"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧战报：**默认收起**成一条窄边，点「战报」才展开占 30% 宽。
+             展开时是把牌桌挤窄，不是盖在上面。 -->
+        <div id="side" class="folded">
+          <div class="side-title">
+            <button id="side-toggle" class="side-toggle">战报 ▸</button>
+          </div>
+          <div id="side-now"></div>
+          <div id="log"></div>
+        </div>
+      </div>
+
+      <!-- 下方 40%：你的手牌。
+           注意它**横跨整个屏幕宽度**（不在战报栏左边），
+           这样 25 张牌一行就摆得下，牌面能做得更大、不用滚动。 -->
+      <div id="seat-bottom" class="seat">
+        <div id="hand"></div>
+        <div id="hand-bar">
+          <div class="seat-head">
+            <div class="avatar" id="avatar-0"></div>
+            <div class="seat-name" id="name-0">你</div>
+          </div>
+          <div id="actions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/cards.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

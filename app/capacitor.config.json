@@ -1,0 +1,12 @@
+{
+  "appId": "com.crazymonkey.tractor",
+  "appName": "拖拉机",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#14532d"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

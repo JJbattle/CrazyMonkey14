@@ -1,0 +1,786 @@
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #14532d;
+  color: #fff;
+  overflow: hidden;
+  user-select: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  background: radial-gradient(circle at 50% 30%, #2a7a47, #144024);
+  /* 刘海屏/挖孔屏：横屏时左右留出安全区，免得被摄像头挡住 */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* 顶部信息栏 */
+#info-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.info-item { white-space: nowrap; }
+.info-item.toggle {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  padding: 0 9px;
+  opacity: 0.65;
+}
+.info-item.toggle.on { opacity: 1; border-color: #ffd54a; color: #ffd54a; }
+/* 顶栏最右边的「重开」。margin-left:auto 把它顶到最右边，
+   跟左边那几行信息拉开点距离，免得误碰。 */
+#restart {
+  margin-left: auto;
+  flex: none;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  cursor: pointer;
+}
+#restart:active { background: rgba(255, 255, 255, 0.22); }
+
+/* 主体：上下两块 —— 上面是牌桌+战报，下面整条是手牌 */
+#body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 上半部分：牌桌在左、战报在右 */
+#main {
+  flex: 1 1 60%;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* 牌桌：上面对手的牌，中间出牌区 */
+#table {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  gap: 4px;
+  min-height: 0;
+  min-width: 0;
+  position: relative;      /* 给左上角的操作提示当定位基准 */
+}
+/* 对家那一块（头像+名字 跟 牌堆、张数并排一行）。
+   **贴在牌桌左上角，而且是浮着的**（absolute，不占文档流）——
+   所以牌桌上一点地方都没被它吃掉，出牌区整个高度都是自己的。
+   以前它在牌桌顶上单占一整行（40 多像素高），桌上的牌就一直被压着长不大。
+   （中间试过搬进顶栏，但那毕竟不算在牌桌上了，看着别扭，又挪回来了。） */
+#seat-top {
+  position: absolute;
+  /* 对家（座位 2）坐在牌桌上方，头像摆**中间偏左**一点，
+     不能居中（居中看着太正、太呆），也不能贴死左边。 */
+  left: 36%;
+  transform: translateX(-50%);
+  top: 3px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 45%;         /* 名字再长也不许吃到中间去压对家的牌 */
+  pointer-events: none;   /* 它底下的东西照样点得到 */
+}
+#seat-top .seat-head { margin-bottom: 0; flex: none; }
+#seat-top .seat-name { margin-bottom: 0; padding-left: 2px; }
+#seat-top .seat-count { font-size: 13px; margin-left: 5px; }
+
+/* 下半部分：你的手牌。
+   它**横跨整个屏幕宽度**（战报栏在它上方，不占它的宽度），
+   这样 25 张牌一行就摆得下，牌面能做大、也不用滚动。 */
+#seat-bottom {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 5px 4px;
+}
+/* 扣底的时候：你手里最多有 33 张（发的 25 张 + 8 张底牌），
+   一行根本摆不下。这时候把上方牌桌压下去，腾地方让你的牌全露出来——
+   反正这个阶段出牌区是空的，牌桌闲着也是闲着。 */
+#body.discarding #main { flex: 1 1 36%; }
+#body.discarding #seat-bottom { flex: 0 0 64%; }
+/* 牌桌压矮之后，左右两家的「一叠牌 + 几张」会探到你的手牌底下，
+   露半行在那儿很难看。扣底阶段本来就没人去看别人几张牌，直接收掉，
+   只留头像和名字——牌桌上还看得出坐着谁。 */
+#body.discarding #seat-left .seat-cards,
+#body.discarding #seat-right .seat-cards { display: none; }
+/* 手牌下面那一条：左边是你的头像+名字，右边是操作按钮 */
+#hand-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+}
+#hand-bar .seat-head { margin-bottom: 0; padding-left: 0; flex: none; }
+#hand-bar #actions { flex: 1 1 auto; justify-content: flex-start; padding: 2px 0; min-height: 0; }
+#seat-bottom .avatar { width: 32px; height: 32px; font-size: 16px; }
+.seat { position: relative; }
+.seat-head { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+.seat-head .seat-name { margin-bottom: 0; padding-left: 0; }
+#seat-top .seat-head, #seat-left .seat-head, #seat-right .seat-head { justify-content: center; }
+#seat-bottom .seat-head { padding-left: 5px; }
+
+/* 头像框：以后配了图就自动显示图片，没配就显示名字第一个字 */
+.avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  line-height: 1;
+  font-size: 21px;
+  font-weight: 700;
+  color: #3a2500;
+  background: linear-gradient(180deg, #ffe082, #d99b12);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.cat { border-color: #ffd54a; color: #ffd54a; background: #111; }
+
+.seat-name { font-size: 15px; opacity: 0.92; margin-bottom: 2px; padding-left: 3px; }
+.seat-cards { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+#seat-top .seat-cards { justify-content: center; }
+.seat-count { font-size: 14px; opacity: 0.9; margin-left: 6px; }
+.seat.dealer .seat-name { color: #ffd54a; }
+
+/* 其他三家：只摆一叠卡背，不铺一整列 */
+.card-stack { display: flex; }
+.card-stack .card.back + .card.back { margin-left: -16px; }
+.card-stack .card.back:nth-child(2) { transform: translate(2px, -2px); }
+.card-stack .card.back:nth-child(3) { transform: translate(4px, -4px); }
+
+/* 每局结束的嘴炮气泡 */
+.bubble {
+  display: none;
+  position: absolute;
+  z-index: 6;
+  max-width: 210px;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 7px 11px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1b3a24;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.bubble.on { display: block; }
+/* 北家（对家，顶）：气泡从头像**横着**出来（水平往右），别往下压到出牌区 */
+#bubble-2 { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; }
+/* 东家（下家，右）/ 西家（上家，左）：气泡贴在头像下面、名字底下。
+   bubble 已经挪进 seat-head，让 seat-head 当定位基准，气泡才刚好落在名字底下、
+   不会一路掉到牌堆下面去。 */
+#seat-left .seat-head, #seat-right .seat-head { position: relative; }
+#bubble-1, #bubble-3 { left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; }
+
+/* 每局结算区：摆在牌桌底部居中（玩家手牌正上方那块空位）。
+   结算文字常驻、各家嘴炮挂在下面，竖着排，谁都不压谁。 */
+#round-result {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 13;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  max-width: 76%;
+  text-align: center;
+  pointer-events: none;
+}
+#round-result.on { display: flex; }
+#round-result .rs-summary {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffe082;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+#round-result .rs-taunts {
+  font-size: 14px;
+  color: #fff;
+  opacity: 0.94;
+  line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+/* 底牌：亮出 8 张 + 抠底结果（成功/失败、倍率、得分） */
+#round-result .rs-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+#round-result .rs-bottom-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffe082;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 2px 10px;
+  border-radius: 9px;
+}
+#round-result .rs-bottom-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+#round-result .rs-bottom-cards .card {
+  width: 34px;
+  height: 48px;
+  padding: 2px 0 0 3px;
+}
+#round-result .rs-bottom-cards .crank { font-size: 18px; }
+#round-result .rs-bottom-cards .csuit { font-size: 15px; }
+#round-result .rs-bottom-cards .jbadge { font-size: 9px; padding: 2px 3px; }
+
+/* 右侧战报栏：**默认收起**，只留一条竖条，把地方全让给牌桌；
+   点「战报」才展开，展开时会把牌桌挤窄（不是盖在上面）。 */
+#side {
+  flex: 0 0 30%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.32);
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+#side.folded { flex: 0 0 62px; background: rgba(0, 0, 0, 0.22); }
+/* 收起时只剩那个「战报」按钮（「重开」已经挪到顶栏，不在这儿了） */
+#side.folded #side-now,
+#side.folded #log { display: none; }
+#side.folded .side-title {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 4px;
+  gap: 6px;
+}
+/* 收起时那个按钮要够大够好点（老年人手指不精细） */
+#side.folded .side-toggle {
+  width: 100%;
+  font-size: 15px;
+  letter-spacing: 0;
+  padding: 10px 4px;
+}
+.side-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 6px 10px;
+  color: #ffd54a;
+  background: rgba(0, 0, 0, 0.3);
+}
+.side-title button {
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 3px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.side-title .side-toggle { color: #ffd54a; border-color: rgba(255, 213, 74, 0.6); }
+#side-now {
+  flex: none;
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 5px 10px;
+  min-height: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffe082;
+}
+
+#middle {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 0;
+}
+/* 左右两家。**窄着放，而且头像贴着牌桌外沿**——
+   上家往左靠、下家往右靠，中间让出来的地方全给出牌区，
+   出的牌才摆得大（见下面 @media landscape 里的宽度）。 */
+#seat-left, #seat-right {
+  width: 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+#seat-left { align-items: flex-start; }
+#seat-right { align-items: flex-end; }
+#seat-left .seat-cards, #seat-right .seat-cards { flex-direction: column; align-items: center; }
+#center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+/* 操作提示（该谁出牌、扣底、这圈打完了…）。
+   挂在顶栏「5/10/K 必打」和「重开」之间，宽度跟着文字走（自适应），
+   放不下就随顶栏 flex-wrap 换到下一行。 */
+#status {
+  font-size: 15px;
+  line-height: 1.3;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 5px 11px;
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 中间出牌区：按座位方位摆放（对家在上、下家在右、上家在上左、你在下） */
+#trick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  /* 行距压到 1px：出牌区高一寸，三行牌就能各高一寸，
+     这点缝儿省下来全给了牌面（见 ui.js 的 planTrickCards）。 */
+  gap: 1px 6px;
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  min-height: 96px;
+}
+.trick-play { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.trick-play[data-seat="2"] { grid-area: 1 / 2 / 2 / 3; }
+/* 对家（顶部那家）甩的牌特别多时，别再整手挪到右边那一列——
+   还是待在居中那一列，只往右伸半截：translateX 把自己宽度的一半挪出去，
+   左手边正好落在牌桌正中，往右一路排，左边那一片留给白色提示条和上家。
+   跟 JS 里 fitTrickCards / renderTrickPlays 的「≥ 6 张从居中往右伸」对得上。 */
+.trick-play[data-seat="2"].right-col { transform: translateX(50%); }
+.trick-play[data-seat="3"] { grid-area: 2 / 1 / 3 / 2; }
+.trick-play[data-seat="0"] { grid-area: 3 / 2 / 4 / 3; }
+.trick-play[data-seat="1"] { grid-area: 2 / 3 / 3 / 4; }
+.trick-cards { display: flex; gap: 3px; }
+.trick-play.winner .card { outline: 3px solid #ffd54a; }
+/* 「最大」小牌子：挂在目前桌上最大那一家的牌旁边。
+   **出的牌不再写名字**了——谁出的看方位就一清二楚
+   （上=对家、左=上家、右=下家、下=你自己），名字写在那儿只会把牌挤小。
+   只有「最大」还留着：那是牌型信息，不是身份信息，少了它就不知道这圈谁赢。 */
+.tag-top {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #4a2f00;
+  background: #ffd54a;
+}
+/* 牌堆区正中：本局当前得分。
+   它跟左右两家出的牌并排，比牌高的时候会把那行顶起来——
+   所以内边距压到最小，让它的高度刚好卡在牌高以内（约 48px）。 */
+.pile-info {
+  grid-area: 2 / 2 / 3 / 3;
+  text-align: center;
+  line-height: 1.25;
+  padding: 1px 9px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.pile-info .big { display: block; font-size: 20px; font-weight: 700; color: #ffd54a; }
+.pile-info .sub { display: block; font-size: 14px; opacity: 0.9; }
+.pile-info .last { display: block; font-size: 14px; color: #ffe082; }
+
+/* 发牌期间：谁亮的主、亮的是哪一门，**把那张牌摆在牌桌正中**。
+   一直到开始扣底才收起来（那会儿牌桌要压矮给手牌腾地方）。 */
+.pile-info .bid-head { display: block; font-size: 14px; color: #ffe082; }
+.bid-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bid-cards { display: flex; gap: 3px; justify-content: center; }
+.bid-who { font-size: 14px; color: #ffe082; white-space: nowrap; }
+/* 刚亮出去的主牌给个金圈，一眼看得出「这就是现在的正主」 */
+.bid-cards .card { box-shadow: 0 0 0 2px #ffd54a, 0 1px 2px rgba(0, 0, 0, 0.4); }
+
+/* 牌 —— 字号按「老年人手机上也看得清」来定 */
+.card {
+  width: 46px;
+  height: 66px;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;     /* 点数放左上角，重叠后也看得见 */
+  justify-content: flex-start;
+  padding: 3px 0 0 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  position: relative;
+  flex: none;
+}
+.card.red { color: #c0392b; }
+
+/* 卡背：家里那只猫 */
+.card.back {
+  background: #2c4d8c url('assets/cat-back.jpg') center / cover no-repeat;
+  border: 1px solid #e8e8e8;
+  width: 30px;
+  height: 42px;
+  padding: 0;
+}
+
+/* 大小王：同一张猫图，不改颜色，只靠边框区分 */
+.card.joker {
+  background: #111 url('assets/cat-joker.jpg') center / cover no-repeat;
+  color: #fff;
+  overflow: hidden;
+  padding: 0;
+}
+.card.joker.joker-big { border: 3px solid #ffc107; box-shadow: 0 0 0 1px #7a5200, 0 1px 3px rgba(0,0,0,.55); }
+.card.joker.joker-small { border: 3px solid #cfd8dc; box-shadow: 0 0 0 1px #46565f, 0 1px 3px rgba(0,0,0,.55); }
+.card.joker .jbadge {
+  position: absolute; right: 1px; bottom: 1px;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 14px; font-weight: 700; line-height: 1;
+  padding: 3px 4px; border-radius: 4px;
+}
+.card.joker.joker-big .jbadge { color: #ffc107; }
+.card.joker.joker-small .jbadge { color: #e3f2fd; }
+.card.joker.small .jbadge { font-size: var(--tj, 14px); }
+
+/* 出牌区的牌。**基准就跟手牌一样大**（52×74），四个值由 JS 按牌桌上
+   剩下的地方算出来（见 ui.js 的 planTrickCards / fitTrickCards），写在 #trick 上；
+   下面括号里是量不到尺寸时的兜底，跟 JS 里的基准值保持一致。
+   以前这儿写死 32×45、横屏还压到 30×43，比手牌小一大截，
+   老人盯着牌桌上那几张根本看不清。 */
+.card.small { width: var(--tw, 52px); height: var(--th, 74px); padding: 3px 0 0 4px; }
+/* 点数和花色都堆在牌**左上角**（重叠时只有这一条露在外面，所以只能堆这儿）。
+   字号由 JS 按牌面宽度算（牌宽 × 0.52 / 0.45，见 ui.js），
+   这里括号里是量不到尺寸时的兜底。点数特意做得又大又粗——
+   老人看牌主要就认这一个数。 */
+.crank { font-size: 26px; font-weight: 700; line-height: 1; }
+.csuit { font-size: 22px; line-height: 1; }
+.card.small .crank { font-size: var(--tf, 26px); }
+.card.small .csuit { font-size: var(--ts, 22px); }
+.card.back .crank, .card.back .csuit { display: none; }
+
+/* 手牌：**手里的牌永远全部同时看得见，不滚动**。
+   --cw / --ch  牌面大小
+   --ov         牌与牌之间叠多少（负数）
+   --cf / --cs  点数和花色的字号
+   这四个值都由 JS 按当前可用空间算出来（见 ui.js 的 planHandLayout），
+   牌多、屏幕小就自动叠紧一点甚至整手缩一号，总之保证塞得下。 */
+#hand {
+  --cw: 52px;
+  --ch: 74px;
+  --ov: -16px;
+  --cf: 26px;
+  --cs: 22px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  /* 列间距 8px 就是 JS 里 HAND_GAP；用 gap 而不是 margin，
+     换行时行末不会多出一截，跟 JS 算出来的宽度才对得上 */
+  gap: 4px 8px;
+  justify-content: flex-start;
+  /* 上下留白加起来 24px = JS 里的 HAND_PAD；
+     上面留 20px 是给「选中的牌往上抬 18px」腾地方，不然会被裁掉 */
+  padding: 20px 2px 4px;
+  overflow: hidden;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+#hand .card { width: var(--cw); height: var(--ch); }
+#hand .crank { font-size: var(--cf); }
+#hand .csuit { font-size: var(--cs); }
+/* z-index: 0 是**故意**写的：给所有手牌钉在同一个层里，
+   谁压谁就纯看文档顺序（也就是只看左右先后）。
+   不写的话，被 transform 抬起来的牌会自动跑上层去，
+   又把右边那张的点数遮住了——这正是之前那个毛病。 */
+#hand .card { cursor: pointer; transition: transform 0.1s; z-index: 0; }
+#hand .card.highlight { box-shadow: 0 0 0 3px #ffd54a, 0 1px 2px rgba(0,0,0,.4); }
+/* 选中的牌抬起来。抬得比原来高（-18px），牌面看得更清楚；
+   但**故意不给 z-index**，让它老老实实被右边那张压住——
+   这样右边那张牌的点数区一点没被挡，随时点得着。
+   抬起来露在外面的那截（上半部分）还是自己的，点它就取消选中。
+   同一门里后面那张天然画在前面那张上面，靠的就是这里的文档顺序。 */
+#hand .card.selected {
+  transform: translateY(-18px);
+  box-shadow: 0 0 0 4px #4fc3f7, 0 3px 6px rgba(0,0,0,.5);
+}
+.suit-group { display: inline-flex; flex-wrap: nowrap; gap: 0; }
+.suit-group .card + .card { margin-left: var(--ov, -16px); }
+
+/* 操作按钮（在手牌下面那一条里，跟你的头像并排） */
+#actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 2px;
+}
+#actions button {
+  font-size: 17px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 9px;
+  background: #f7b731;
+  color: #3a2500;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+#actions button:disabled { background: #9aa5a0; color: #e0e0e0; cursor: not-allowed; }
+#actions button:active:not(:disabled) { transform: translateY(1px); }
+#actions .wait { align-self: center; opacity: 0.7; font-size: 15px; }
+#actions .play-hint {
+  align-self: center;
+  font-size: 14px;
+  line-height: 1.25;
+  color: #ffd54a;
+  text-align: center;
+  max-width: 100%;
+}
+#actions .play-hint.bad { color: #ffb59e; }
+#actions button.speed { background: #3b7dd8; color: #fff; font-weight: 600; padding: 9px 12px; }
+/* 当前选中的那一档发牌速度：换个亮黄 + 白圈描边，一眼看清现在用哪个 */
+#actions button.speed.on {
+  background: #ffd54a;
+  color: #3a2500;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f7b731, 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+/* 一圈打完后那个「下一轮」—— 做得又大又亮，一眼看得见、好点 */
+#actions button.next-trick {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 9px 24px;
+  background: linear-gradient(180deg, #ffe082, #f7b731);
+  color: #4a2f00;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+/* 旁边那句「这一圈谁最大、拿了多少分」 */
+#actions .trick-summary { align-self: center; font-size: 16px; color: #ffe082; }
+
+/* ---------- 亮牌阶段那一排叫牌按钮 ---------- */
+/* 四个花色 + 小王 + 大王，**位置永远固定**：能亮的亮着（哪里亮了点哪里），
+   点不动的灰着。手里攥着同一门两张级牌时，按钮角上挂个「×2」，
+   再点一次就是加保/反主——这就是「自保时再复亮一次」。
+   比一排会变来变去、还写着长句子的文字按钮直观得多。 */
+.suit-btns { display: flex; gap: 4px; flex: none; }
+#actions button.suit-btn {
+  position: relative;
+  width: 56px;
+  padding: 5px 0;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+/* 红桃、方块用红字，跟牌面一致 */
+#actions button.suit-btn.red { color: #b3261e; }
+/* 大小王那两个字比花色符号窄，字号收一收免得挤出格子 */
+#actions button.suit-btn.joker-btn { font-size: 17px; }
+/* 点不动的那几门：压暗，但仍然占着位置，位置一辈子不变。
+   这条必须写在 .red 后面，不然红字压不过去。 */
+#actions button.suit-btn:disabled { background: rgba(0, 0, 0, 0.45); color: rgba(255, 255, 255, 0.42); }
+/* 角上那个「×2」：说明点下去是加保/反主（两张），不是单纯亮个主 */
+#actions .suit-btn .sb-tag {
+  position: absolute;
+  right: -5px;
+  top: -6px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: #d32f2f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+/* 战报 */
+#log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5px 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.log-line { word-break: break-word; }
+.log-line.hi { color: #ffd54a; }
+
+/* 牌桌右上角那一块「浮着说话」的地方：拖拉机/甩牌招牌 + 表扬/甩牌失败横幅。
+   两个都挂在这个框里往下叠着排，互相不压；框贴死在角上、不吃点击。
+   宽度封顶 54%，所以最长也就伸到牌桌中间偏右，碰不到对家的牌和中间的牌堆区。
+   以前这两个都是 `position: fixed` 摆屏幕正中（top: 20%），
+   一出拖拉机、或者一甩牌失败，正好把牌面糊住。 */
+#corner {
+  position: absolute;
+  right: 6px;
+  top: 4px;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 54%;
+  pointer-events: none;
+}
+
+/* 绕完一整圈（从 2 打到王）的表扬 / 甩牌失败的说明 */
+#banner {
+  display: none;
+  /* 收窄一点：这块虽然贴在角上，但往左伸太长会压到右座那家的牌背，
+     往下伸太长会压到下家出的牌。**只能小**——它是浮在牌桌上面的。 */
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffe082, #f7b731);
+  color: #4a2f00;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-line;
+  transform-origin: top right;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+#banner.on { display: block; animation: pop 0.35s ease-out; }
+/* 甩牌失败：红色警告样式 */
+#banner.warn {
+  background: linear-gradient(180deg, #ff8a65, #e64a19);
+  color: #fff;
+}
+@keyframes pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 绕完一整圈的表扬：摆屏幕正中，隆重一点。
+   那会儿这一局已经打完了，牌桌上没有要看的牌，挡不着谁。
+   （会挡牌的只有甩牌失败那条红杠，它留在右上角） */
+#banner.praise {
+  position: fixed;
+  left: 50%;
+  top: 20%;
+  transform: translateX(-50%);
+  transform-origin: center;
+  max-width: 80vw;
+  padding: 14px 22px;
+  font-size: 19px;
+  line-height: 1.5;
+  text-align: center;
+}
+#banner.praise.on { animation: popMid 0.35s ease-out; }
+@keyframes popMid {
+  from { transform: translateX(-50%) scale(0.88); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+/* ---------- 出牌小动画：拖拉机 / 甩牌 / 压过人家 ---------- */
+/* 领出甩牌或拖拉机、或者把桌上的牌压过去时，闪一下的字。
+   位置交给 #corner 那个框（贴牌桌右上角），以前是 fixed 摆屏幕正中，
+   一出拖拉机就把牌面盖住了，反而碍事。 */
+#flourish {
+  display: none;
+  transform-origin: top right;   /* 缩放/旋转都从右上角长出来，不往牌桌上压 */
+  padding: 8px 24px;
+  border-radius: 14px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  white-space: nowrap;
+  color: #4a2f00;
+  background: linear-gradient(180deg, #ffe082, #f7b731);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+}
+#flourish.on { display: block; animation: flourish 1.5s ease-out forwards; }
+/* 从右上角弹出来，最后往右上方飘走 —— 全程在角上，不进牌桌中间 */
+@keyframes flourish {
+  0%   { opacity: 0; transform: scale(0.45) rotate(-10deg); }
+  18%  { opacity: 1; transform: scale(1.18) rotate(4deg); }
+  34%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  72%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(14px, -26px) scale(0.95) rotate(0deg); }
+}
+
+/* 每一手牌都一张张蹦出来（逐张的延迟由 JS 设，见 renderTrickPlays）。
+   这样一圈里谁出了什么，看得一清二楚，不会「唰」地一下全冒出来。 */
+.trick-play.pop .card {
+  animation: cardPop 0.3s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+@keyframes cardPop {
+  from { opacity: 0; transform: scale(0.35) translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+/* 拖拉机 / 甩牌的那一手，牌再镶一圈金边，跟普通出牌区分开 */
+.trick-play.flourish .card { box-shadow: 0 0 0 2px #ffd54a; }
+
+/* 你自己的名字用金色标一下，一眼看得出哪个座位是自己 */
+.seat-name.me { color: #ffd54a; font-weight: 700; opacity: 1; }
+
+/* 手机竖屏 */
+@media (max-width: 480px) {
+  .bubble { max-width: 160px; font-size: 14px; }
+  #side { flex: 0 0 30%; }
+  #log { font-size: 12px; }
+}
+
+/* 横屏（手机横向持握）——主要目标。
+   注意：横屏高度只有 300~450px，所以这里**不再缩小字号**，
+   只把出牌区的小牌压小一点，手牌和文字尽量保持大。 */
+@media (orientation: landscape) {
+  #app { max-width: none; }
+  /* 牌桌外框和内缝都收到最紧：出牌区每多一分高度，三行牌就能
+     各多一分（那才是真正卡着牌面大小的东西）。 */
+  #table { padding: 2px; gap: 3px; }
+  /* 左右两家只占 66px（原来 92px，白占了 26px × 2）。
+     头像和牌堆还各自贴到牌桌外沿，中间那一大条全让给出牌区。
+     量过：牌堆 54px、名字 45px，66px 装得下。 */
+  #seat-left, #seat-right { width: 66px; }
+  #seat-left .seat-head, #seat-right .seat-head { flex-direction: column; gap: 3px; }
+  .avatar { width: 34px; height: 34px; font-size: 17px; }
+  #trick { min-height: 88px; }
+  /* 卡背是 #seat-top 那一行里最高的一块（头像才 34），它直接顶着出牌区。
+     横屏压小一号，省下的高度全给出牌区的牌——那才是要看清的东西。
+     反正这一叠只是「他有几张」的示意，不靠它认牌。 */
+  .card.back { width: 26px; height: 36px; }
+  .card-stack .card.back + .card.back { margin-left: -15px; }
+  /* 出牌区的牌**不再按横屏单独缩小**：大小交给 JS 按空间算，
+     横屏本来地方最紧，可给的余地也最大的就是这儿。 */
+  .pile-info { padding: 1px 10px; }
+  #banner { font-size: 18px; padding: 10px 18px; top: 16%; }
+}

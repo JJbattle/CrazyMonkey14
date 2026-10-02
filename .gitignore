@@ -1,0 +1,17 @@
+# ===== 大文件 / 安装包 / 无用旧文件（绝不进 git）=====
+*.exe
+king.png
+截图/
+
+# ===== Android 打包：工具链、依赖、产物（本地可重建，不进 git）=====
+app/.toolchain/
+app/node_modules/
+app/www/
+app/android/
+app/*.apk
+
+# ===== 系统垃圾 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
