@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>跳棋</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ 主菜单 ============ -->
+    <div id="screen-menu" class="screen">
+      <div class="menu-title">跳 棋</div>
+      <div class="menu-subtitle">简单 · 字大 · 不催人</div>
+      <div class="menu-btns">
+        <button id="btn-start" class="big-btn">开始游戏</button>
+        <button id="btn-continue" class="big-btn secondary">继续游戏</button>
+        <button id="btn-setup" class="big-btn secondary">游戏设置</button>
+      </div>
+    </div>
+
+    <!-- ============ 开局设置 ============ -->
+    <div id="screen-setup" class="screen hidden">
+      <div class="setup-title">游戏设置</div>
+
+      <div class="setup-row">
+        <span class="setup-label">人数</span>
+        <div id="count-btns" class="count-btns"></div>
+      </div>
+
+      <div class="setup-row">
+        <span class="setup-label">位置提示</span>
+        <button id="btn-hints" class="toggle-btn human">开</button>
+      </div>
+
+      <div id="seat-list" class="seat-list"></div>
+
+      <div class="setup-actions">
+        <button id="btn-setup-back" class="big-btn secondary">返回</button>
+        <button id="btn-setup-go" class="big-btn">开始</button>
+      </div>
+    </div>
+
+    <!-- ============ 对局 ============ -->
+    <div id="screen-game" class="screen hidden">
+      <div id="top-bar">
+        <div id="turn-indicator">
+          <div id="turn-avatar" class="turn-avatar"></div>
+          <div id="turn-text" class="turn-text">轮到你了</div>
+        </div>
+        <div id="top-btns">
+          <button id="btn-difficulty" class="top-btn diff">难度：普通</button>
+          <button id="btn-undo" class="top-btn">悔棋</button>
+          <button id="btn-menu" class="top-btn">菜单</button>
+        </div>
+      </div>
+
+      <div id="board-wrap">
+        <canvas id="board"></canvas>
+      </div>
+
+      <div id="bottom-bar">
+        <button id="btn-end-chain" class="end-chain hidden">结束连跳</button>
+        <div id="hint" class="hint"></div>
+      </div>
+    </div>
+
+    <!-- ============ 暂停菜单（覆盖层） ============ -->
+    <div id="overlay-menu" class="overlay hidden">
+      <div class="overlay-box">
+        <div class="overlay-title">菜单</div>
+        <button id="btn-resume" class="big-btn">继续游戏</button>
+        <button id="btn-sound" class="big-btn secondary">声音：开</button>
+        <button id="btn-debug" class="big-btn secondary">调试：关</button>
+        <button id="btn-restart" class="big-btn secondary">重新开始</button>
+        <button id="btn-exit" class="big-btn secondary">退出本局</button>
+      </div>
+    </div>
+
+    <!-- ============ 结算覆盖层 ============ -->
+    <div id="overlay-win" class="overlay hidden">
+      <div class="overlay-box">
+        <div id="win-title" class="overlay-title">你赢啦！</div>
+        <div id="win-sub" class="win-sub"></div>
+        <div id="win-btns">
+          <button id="btn-win-watch" class="big-btn">继续观看</button>
+          <button id="btn-win-exit" class="big-btn secondary">结束游戏</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 连跳鼓励浮字 ============ -->
+    <div id="cheer" class="cheer hidden"></div>
+
+    <!-- ============ AI 调试面板（覆盖层） ============ -->
+    <div id="overlay-debug" class="overlay hidden">
+      <div class="overlay-box debug-box">
+        <div class="overlay-title">AI 调试</div>
+        <div id="debug-content" class="debug-content"></div>
+        <button id="btn-debug-close" class="big-btn secondary">关闭</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/board.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/evaluate.js"></script>
+  <script src="js/zobrist.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

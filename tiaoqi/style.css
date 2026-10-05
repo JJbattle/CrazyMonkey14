@@ -1,0 +1,173 @@
+/* style.css —— 跳棋 老人友好 UI
+   原则：字大、按钮大、对比强、不精确点击也能点中。横屏优先。 */
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  background: #2c3e50;
+  color: #f5f7fa;
+}
+
+.hidden { display: none !important; }
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- 大按钮 ---------- */
+.big-btn {
+  display: block;
+  width: min(80vw, 460px);
+  min-height: 84px;
+  margin: 14px auto;
+  font-size: 40px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #fff;
+  background: #2f6fe0;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 6px 0 #1d4f9c;
+  cursor: pointer;
+}
+.big-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1d4f9c; }
+.big-btn.secondary { background: #5a6b7d; box-shadow: 0 6px 0 #3b4a58; }
+.big-btn.secondary:active { box-shadow: 0 2px 0 #3b4a58; }
+
+/* ---------- 主菜单 ---------- */
+.menu-title { font-size: 120px; font-weight: bold; letter-spacing: 20px; margin-bottom: 10px; }
+.menu-subtitle { font-size: 30px; color: #b8c4d0; margin-bottom: 60px; }
+
+/* ---------- 设置 ---------- */
+#screen-setup { justify-content: flex-start; padding-top: 30px; }
+.setup-title { font-size: 56px; font-weight: bold; margin-bottom: 24px; }
+
+.setup-row { display: flex; align-items: center; margin-bottom: 16px; }
+.setup-label { font-size: 34px; margin-right: 20px; color: #b8c4d0; }
+.count-btns { display: flex; gap: 12px; }
+.count-btn {
+  width: 72px; height: 72px; font-size: 36px; font-weight: bold;
+  color: #fff; background: #5a6b7d; border: none; border-radius: 16px; cursor: pointer;
+}
+.count-btn.on { background: #2f6fe0; }
+
+.seat-list { width: min(92vw, 560px); overflow-y: auto; }
+.seat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; margin-bottom: 10px;
+  background: rgba(255,255,255,0.08); border-radius: 16px;
+}
+.seat-info { display: flex; align-items: center; gap: 14px; font-size: 32px; }
+.seat-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #fff; }
+.seat-ctrl { display: flex; gap: 8px; align-items: center; }
+.toggle-btn {
+  min-width: 96px; height: 60px; font-size: 28px; font-weight: bold;
+  color: #fff; background: #5a6b7d; border: none; border-radius: 12px; cursor: pointer;
+}
+.toggle-btn.human { background: #2f6fe0; }
+.diff-btn {
+  min-width: 76px; height: 60px; font-size: 26px;
+  color: #fff; background: #6b5b8a; border: none; border-radius: 12px; cursor: pointer;
+}
+.diff-btn.on { background: #7a3fd0; }
+
+.setup-actions { display: flex; gap: 16px; margin-top: 10px; }
+.setup-actions .big-btn { width: auto; min-width: 200px; padding: 0 40px; }
+
+/* ---------- 对局 ---------- */
+#screen-game { flex-direction: column; }
+#top-bar {
+  width: 100%; height: 84px; flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; background: rgba(0,0,0,0.18);
+}
+#turn-indicator { display: flex; align-items: center; gap: 16px; }
+.turn-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 34px; color: #fff; }
+.turn-text { font-size: 40px; font-weight: bold; }
+#top-btns { display: flex; gap: 12px; }
+.top-btn {
+  min-width: 110px; height: 64px; font-size: 30px; font-weight: bold;
+  color: #fff; background: #5a6b7d; border: none; border-radius: 14px; cursor: pointer;
+}
+.top-btn.diff { min-width: auto; padding: 0 16px; white-space: nowrap; background: #7a3fd0; }
+
+#board-wrap { flex: 1 1 auto; width: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
+#board { display: block; }
+
+#bottom-bar {
+  width: 100%; min-height: 110px; flex: none;
+  display: flex; align-items: center; justify-content: center; gap: 20px;
+  padding: 10px 20px; background: rgba(0,0,0,0.18);
+}
+.end-chain {
+  width: min(70vw, 420px); height: 88px; font-size: 40px; font-weight: bold;
+  color: #fff; background: #e8930c; border: none; border-radius: 20px;
+  box-shadow: 0 6px 0 #a56708; cursor: pointer;
+}
+.end-chain:active { transform: translateY(4px); box-shadow: 0 2px 0 #a56708; }
+.hint { font-size: 32px; color: #b8c4d0; text-align: center; }
+
+/* ---------- 覆盖层 ---------- */
+.overlay {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.62);
+}
+.overlay-box {
+  width: min(86vw, 520px); padding: 30px 24px;
+  background: #34495e; border-radius: 24px; text-align: center;
+}
+.overlay-title { font-size: 56px; font-weight: bold; margin-bottom: 24px; }
+.win-sub { font-size: 32px; color: #b8c4d0; margin-bottom: 20px; }
+
+/* ---------- AI 调试面板 ---------- */
+.debug-box { width: min(92vw, 720px); text-align: left; }
+.debug-content {
+  max-height: 60vh; overflow-y: auto; margin-bottom: 16px;
+  font-size: 24px; line-height: 1.5; color: #e8eef4;
+  background: rgba(0,0,0,0.22); border-radius: 14px; padding: 14px 16px;
+}
+.debug-content table { width: 100%; border-collapse: collapse; }
+.debug-content th, .debug-content td {
+  padding: 4px 8px; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.debug-content th { color: #ffd34d; font-weight: bold; }
+.debug-content td:first-child, .debug-content th:first-child { text-align: left; }
+.debug-content .dg-head { color: #ffd34d; font-weight: bold; margin: 8px 0 4px; }
+.debug-content .dg-sub { color: #b8c4d0; font-size: 22px; }
+
+/* ---------- 连跳鼓励浮字 ---------- */
+.cheer {
+  position: absolute; left: 50%; top: 42%; z-index: 60;
+  transform: translate(-50%, -50%);
+  font-size: 84px; font-weight: bold; color: #ffd34d;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.4);
+  pointer-events: none;
+  animation: cheer-pop 1.1s ease-out forwards;
+}
+@keyframes cheer-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  60% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -55%) scale(1); }
+}
+
+/* ---------- 手机竖屏时提示横屏（兜底） ---------- */
+@media (orientation: portrait) {
+  #screen-game #board-wrap { align-items: flex-start; }
+}
