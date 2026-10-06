@@ -10,6 +10,13 @@ app/www/
 app/android/
 app/*.apk
 
+# ===== 跳棋打包（和拖拉机共用 app/.toolchain，其余本地产物同样不进 git）=====
+tiaoqi/app/node_modules/
+tiaoqi/app/www/
+tiaoqi/app/android/
+tiaoqi/app/*.apk
+tiaoqi/app/build-log.txt
+
 # ===== 系统垃圾 =====
 .DS_Store
 Thumbs.db
