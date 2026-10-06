@@ -45,27 +45,25 @@
       </div>
     </div>
 
-    <!-- ============ 对局 ============ -->
+    <!-- ============ 对局（横屏：左右侧栏 + 中间大棋盘） ============ -->
     <div id="screen-game" class="screen hidden">
-      <div id="top-bar">
+      <div id="side-left" class="side-bar">
         <div id="turn-indicator">
           <div id="turn-avatar" class="turn-avatar"></div>
           <div id="turn-text" class="turn-text">轮到你了</div>
         </div>
-        <div id="top-btns">
-          <button id="btn-difficulty" class="top-btn diff">难度：普通</button>
-          <button id="btn-undo" class="top-btn">悔棋</button>
-          <button id="btn-menu" class="top-btn">菜单</button>
-        </div>
+        <div id="hint" class="hint"></div>
       </div>
 
       <div id="board-wrap">
         <canvas id="board"></canvas>
       </div>
 
-      <div id="bottom-bar">
-        <button id="btn-end-chain" class="end-chain hidden">结束连跳</button>
-        <div id="hint" class="hint"></div>
+      <div id="side-right" class="side-bar">
+        <button id="btn-difficulty" class="side-btn diff">难度：普通</button>
+        <button id="btn-undo" class="side-btn">悔棋</button>
+        <button id="btn-menu" class="side-btn">菜单</button>
+        <button id="btn-end-chain" class="side-btn end-chain hidden">结束连跳</button>
       </div>
     </div>
 

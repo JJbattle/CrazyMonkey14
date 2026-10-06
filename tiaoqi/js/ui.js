@@ -253,9 +253,13 @@
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // 棋盘总宽（size 单位）= 2*sqrt3*12，总高 = 24
-    const pad = 0.92;
-    layout_.size = Math.min(w / (24 * B.SQ3), h / 24) * pad;
+    // 棋盘几何：棋位中心横向 12√3、纵向 24（点顶六角星，竖比横长）。
+    // 棋子半径 = 0.42×spacing，四周再外扩一个半径，免得顶角棋子被裁。
+    const overhang = 2 * 0.42 * B.SQ3;   // 两侧共 0.84√3
+    const BW = 12 * B.SQ3 + overhang;    // 横向总宽（含棋子）
+    const BH = 24 + overhang;            // 纵向总高（含棋子）
+    const pad = 0.98;
+    layout_.size = Math.min(w / BW, h / BH) * pad;
     layout_.ox = w / 2;
     layout_.oy = h / 2;
     layout_.spacing = B.SQ3 * layout_.size;
