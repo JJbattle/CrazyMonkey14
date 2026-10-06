@@ -79,61 +79,55 @@ body {
 .diff-name { font-size: 6vh; font-weight: bold; letter-spacing: 4px; }
 .diff-desc { font-size: 3.2vh; color: #e8eef4; }
 
-/* ---------- 对局（横屏） ---------- */
+/* ---------- 对局（横屏：左右侧栏 + 中间大牌桌，牌桌上下顶到屏幕两端） ---------- */
 #screen-game {
-  flex-direction: column;
+  flex-direction: row;
   align-items: stretch;
   justify-content: flex-start;
-  padding-top: max(env(safe-area-inset-top, 0px), 2vh);
+  /* 上下各留安全区，别让最上/最下的牌贴边点不到 */
+  padding: max(env(safe-area-inset-top, 0px), 1.6vh) 0 max(env(safe-area-inset-bottom, 0px), 1.2vh);
 }
 
-/* 顶栏：左信息 + 右 8 个完成槽 */
-#game-top {
+.side-bar {
   flex: none;
-  height: 9vh;
+  width: 14vw;
+  min-width: 96px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 2vw;
+  justify-content: center;
+  gap: 2.6vh;
+  padding: 1.6vh 0.6vw;
+  background: rgba(0, 0, 0, 0.18);
 }
-#info { display: flex; align-items: baseline; gap: 2.6vw; font-size: 3.6vh; }
-.info-diff { color: #ffd34d; font-weight: bold; }
+
+/* 左栏信息：难度/时间/步数竖排 + 完成槽 */
+#info { display: flex; flex-direction: column; align-items: center; gap: 1.4vh; font-size: 3.4vh; }
+.info-diff { color: #ffd34d; font-weight: bold; text-align: center; }
 .info-item { color: #e8eef4; }
 
-#slots { display: flex; gap: 0.5vw; }
+#slots { display: grid; grid-template-columns: repeat(2, auto); gap: 0.8vh; }
 .slot {
-  width: 6.4vh; height: 8vh;
+  width: 6vh; height: 7.6vh;
   border: 2px solid rgba(255,255,255,0.35);
   border-radius: 0.8vh;
   display: flex; align-items: center; justify-content: center;
-  font-size: 3.6vh; color: rgba(255,255,255,0.2);
+  font-size: 3.4vh; color: rgba(255,255,255,0.2);
   background: rgba(0,0,0,0.16);
 }
 .slot.full { border-color: #ffd34d; background: rgba(255,211,77,0.22); color: #ffd34d; font-weight: bold; }
 
-/* 中间：桌面画布 */
-#game-mid {
-  flex: 1 1 auto;
-  position: relative;
-  min-height: 0;
-}
-#board { display: block; width: 100%; height: 100%; touch-action: none; }
+/* 中间：桌面画布（铺满剩余空间） */
+#board-wrap { flex: 1 1 auto; min-width: 0; position: relative; }
+#board { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 
-/* 底栏：悔棋/提示/菜单 + 右下牌库 */
-#game-bottom {
-  flex: none;
-  height: 13vh;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2vw;
-}
-#bottom-btns { display: flex; gap: 2vw; }
+/* 右栏按钮：竖排 */
 .side-btn {
-  min-width: 20vw; height: 11vh;
-  font-size: 4.4vh; font-weight: bold;
+  width: 100%;
+  height: 11vh;
+  font-size: 4.2vh; font-weight: bold;
   color: #fff;
-  background: #5a6b7d; border: none; border-radius: 1.8vh;
+  background: #5a6b7d; border: none; border-radius: 1.6vh;
   box-shadow: 0 0.5vh 0 #3b4a58;
   cursor: pointer;
 }
@@ -142,7 +136,7 @@ body {
 /* 牌库：一张卡背 + 剩余组数 */
 #stock {
   position: relative;
-  width: 13vh; height: 16vh;
+  width: 12vh; height: 15vh;
   border: none; border-radius: 1.2vh;
   background-color: transparent;
   background-image: url('assets/cat-back.jpg');
@@ -159,12 +153,12 @@ body {
   50% { box-shadow: 0 0 2vh #ffd34d; }
 }
 .stock-count {
-  position: absolute; right: 0.5vh; top: 0.5vh;
-  min-width: 4.4vh; height: 4.4vh; line-height: 4.4vh;
+  position: absolute; right: 0.4vh; top: 0.4vh;
+  min-width: 4.2vh; height: 4.2vh; line-height: 4.2vh;
   padding: 0 0.5vh;
   background: #e05b3a; color: #fff;
-  font-size: 3.2vh; font-weight: bold;
-  border-radius: 2.2vh; text-align: center;
+  font-size: 3vh; font-weight: bold;
+  border-radius: 2.1vh; text-align: center;
 }
 
 /* ---------- 覆盖层 ---------- */
@@ -249,5 +243,5 @@ body {
 
 /* ---------- 竖屏时提示横屏（兜底） ---------- */
 @media (orientation: portrait) {
-  #screen-game #game-mid { min-height: 0; }
+  #screen-game #board-wrap { min-width: 0; }
 }

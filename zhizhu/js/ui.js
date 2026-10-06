@@ -1,7 +1,7 @@
 // ui.js —— 蜘蛛纸牌 UI 层（画布渲染 + 交互 + 动画 + 声音 + 计时 + 存档）
 //
 // 规则一律问 Rules/Game，这里不改牌数据、不自己判规则。
-// 横屏优先：顶部（难度/时间/步数 + 8 完成槽），中间 10 列画布，底部（悔棋/提示/菜单 + 右下牌库）。
+// 横屏优先：左侧（难度/时间/步数 + 8 完成槽），中间 10 列画布，右侧（悔棋/提示/菜单 + 牌库）。
 
 (function () {
   'use strict';
@@ -551,7 +551,8 @@
     }
     clearSel(); clearHint(); sfx('deal');
     const dealt = state.stock.slice(0, 10);
-    const startX = W - cardW - margin * 1.5, startY = Math.max(0, H - cardH * 0.45);
+    // 牌库在右侧栏，发牌从牌桌右边缘飞入各列
+    const startX = W - cardW - margin, startY = Math.max(0, H * 0.5 - cardH * 0.5);
     const starts = dealt.map(() => ({ x: startX, y: startY }));
     const ends = state.tableau.map((col, i) => { const g = geoFor(col); return { x: colX(i), y: g.tops[col.length] }; });
     const dur = 260 * SPEED_MUL[S.animSpeed];
@@ -606,7 +607,7 @@
     const ghost = Array.from({ length: Math.min(13, 13) }, (_, i) => ({ card: { s: 0, r: 13 - i, u: 1 }, x: startX, y: startY - i * 2 }));
     addTween(360 * SPEED_MUL[S.animSpeed], p => {
       const e = ease(p);
-      const gx = W * 0.78, gy = H * 0.02;
+      const gx = W * 0.02, gy = H * 0.02;
       ghostCards = ghost.map((g, k) => ({ card: g.card, x: g.x + (gx - g.x) * e, y: g.y + (gy - g.y) * e - k * 3, w: cardW, h: cardH }));
     }, () => { ghostCards = null; });
   }

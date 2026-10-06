@@ -44,9 +44,9 @@
       <button id="btn-diff-back" class="big-btn secondary">返回</button>
     </div>
 
-    <!-- ============ 对局 ============ -->
+    <!-- ============ 对局（横屏：左右侧栏 + 中间大牌桌） ============ -->
     <div id="screen-game" class="screen hidden">
-      <div id="game-top">
+      <div id="side-left" class="side-bar">
         <div id="info">
           <span id="info-diff" class="info-diff">简单 · 1花色</span>
           <span id="info-time" class="info-item">时间 00:00</span>
@@ -55,16 +55,14 @@
         <div id="slots"></div>
       </div>
 
-      <div id="game-mid">
+      <div id="board-wrap">
         <canvas id="board"></canvas>
       </div>
 
-      <div id="game-bottom">
-        <div id="bottom-btns">
-          <button id="btn-undo" class="side-btn">悔棋</button>
-          <button id="btn-hint" class="side-btn">提示</button>
-          <button id="btn-menu" class="side-btn">菜单</button>
-        </div>
+      <div id="side-right" class="side-bar">
+        <button id="btn-undo" class="side-btn">悔棋</button>
+        <button id="btn-hint" class="side-btn">提示</button>
+        <button id="btn-menu" class="side-btn">菜单</button>
         <button id="stock" class="stock">
           <span id="stock-count" class="stock-count">5</span>
         </button>
