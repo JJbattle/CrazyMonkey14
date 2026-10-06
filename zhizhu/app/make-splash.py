@@ -1,4 +1,4 @@
-# 生成启动画面：绿呢底 + 「蜘蛛纸牌」+ 副标题，替换 Capacitor 默认图。
+# 生成启动画面：绿呢底 + 「墩布纸牌」+ 副标题，替换 Capacitor 默认图。
 # 跑法：python make-splash.py
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import os, glob
@@ -36,7 +36,7 @@ def make(w, h, out_path):
         r = int(h * 0.030)
         d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=col)
 
-    txt = '蜘蛛纸牌'
+    txt = '墩布纸牌'
     f = load_font(int(h * 0.15))
     bb = d.textbbox((0, 0), txt, font=f)
     d.text((w / 2 - (bb[2] - bb[0]) / 2 - bb[0], int(h * 0.36)), txt, font=f, fill=(255, 255, 255))

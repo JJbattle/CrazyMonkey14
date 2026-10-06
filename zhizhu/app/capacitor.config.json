@@ -1,6 +1,6 @@
 {
   "appId": "com.crazymonkey.zhizhu",
-  "appName": "蜘蛛纸牌",
+  "appName": "墩布纸牌",
   "webDir": "www",
   "android": {
     "allowMixedContent": false,

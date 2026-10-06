@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ============================================
-echo   蜘蛛纸牌 APK 打包
+echo   墩布纸牌 APK 打包
 echo ============================================
 echo.
 
@@ -79,11 +79,11 @@ if not "%RC%"=="0" (
 
 echo.
 echo 把成品复制到 app 目录 ...
-copy /y "android\app\build\outputs\apk\debug\app-debug.apk" "蜘蛛纸牌.apk" >nul
+copy /y "android\app\build\outputs\apk\debug\app-debug.apk" "墩布纸牌.apk" >nul
 
 echo.
 echo ============================================
 echo   打包成功！
-echo   成品： %~dp0蜘蛛纸牌.apk
+echo   成品： %~dp0墩布纸牌.apk
 echo ============================================
 pause

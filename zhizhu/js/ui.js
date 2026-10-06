@@ -14,6 +14,30 @@
   /* ============ 设置（持久化，与牌局分开） ============ */
   const SETTINGS_KEY = 'zhizhu-settings';
   const LAST_DIFF_KEY = 'zhizhu-lastdiff';
+
+  // —— 胜利统计（按难度 0简单/1普通/2困难）——
+  const STATS_KEY = 'zhizhu-stats-v1';
+  function loadStats() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STATS_KEY) || 'null') || {};
+      for (let d = 0; d < 3; d++) if (typeof s[d] !== 'number') s[d] = 0;
+      return s;
+    } catch (e) { return { 0: 0, 1: 0, 2: 0 }; }
+  }
+  function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (e) {} }
+  function recordWin(diff) {
+    const s = loadStats();
+    s[diff] = (s[diff] || 0) + 1;
+    saveStats(s);
+  }
+  function renderStats() {
+    const elStats = el('stats');
+    if (!elStats) return;
+    const s = loadStats();
+    const parts = [];
+    for (let d = 0; d < 3; d++) parts.push(C.DIFFICULTIES[d].name + ' ' + (s[d] || 0) + ' 局');
+    elStats.textContent = '胜利：' + parts.join('　');
+  }
   const TUTORIAL_KEY = 'zhizhu-tutorial-done';
   function loadSettings() {
     try { return Object.assign({ sound: true, vibrate: true, cardSize: 1, animSpeed: 1, clickMove: true, dragMove: true }, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
@@ -587,6 +611,7 @@
 
   function onWin() {
     save(); localStorage.removeItem(G.SAVE_KEY);
+    recordWin(state.difficulty);
     const t = formatTime(Math.round(elapsedMs / 1000));
     el('win-sub').textContent = '用时 ' + t + '　步数 ' + state.moveCount + '　悔棋 ' + state.undoCount + '　提示 ' + state.hintCount;
     sfx('win'); cheer('恭喜完成！');
@@ -699,7 +724,11 @@
     showScreen('screen-game');
     updateHUD();
   }
-  function toMenu() { save(); gameActive = false; showScreen('screen-menu'); el('btn-continue').classList.toggle('hidden', !hasSave()); }
+  function refreshMenu() {
+    el('btn-continue').classList.toggle('hidden', !hasSave());
+    renderStats();
+  }
+  function toMenu() { save(); gameActive = false; showScreen('screen-menu'); refreshMenu(); }
   function showDifficulty() {
     const last = Number(localStorage.getItem(LAST_DIFF_KEY) || '0');
     $$('.diff-card').forEach(b => b.classList.toggle('current', Number(b.dataset.d) === last));
@@ -726,7 +755,7 @@
     el('btn-settings').addEventListener('click', () => showScreen('overlay-settings'));
     // 难度
     $$('.diff-card').forEach(b => b.addEventListener('click', () => newGame(Number(b.dataset.d))));
-    el('btn-diff-back').addEventListener('click', () => { showScreen('screen-menu'); el('btn-continue').classList.toggle('hidden', !hasSave()); });
+    el('btn-diff-back').addEventListener('click', () => { showScreen('screen-menu'); refreshMenu(); });
     // 对局底部
     el('btn-undo').addEventListener('click', doUndo);
     el('btn-hint').addEventListener('click', doHint);
@@ -768,9 +797,9 @@
   window.addEventListener('resize', () => { relayout(); render(); });
   function init() {
     applySettingsUI();
-    el('btn-continue').classList.toggle('hidden', !hasSave());
     bind();
     showScreen('screen-menu');
+    refreshMenu();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

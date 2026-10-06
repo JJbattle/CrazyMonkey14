@@ -52,7 +52,8 @@ body {
 
 /* ---------- 主菜单 ---------- */
 .menu-title { font-size: 13vh; font-weight: bold; letter-spacing: 0.1em; margin-bottom: 0.5vh; }
-.menu-subtitle { font-size: 3.6vh; color: #b8c4d0; margin-bottom: 3vh; }
+.menu-subtitle { font-size: 3.6vh; color: #b8c4d0; margin-bottom: 2.4vh; }
+.menu-stats { font-size: 3vh; color: #9fb0c0; margin-bottom: 2.4vh; text-align: center; line-height: 1.5; max-width: 92vw; }
 .menu-btns { display: flex; flex-direction: row; justify-content: center; gap: 2.4vw; }
 .menu-btns .big-btn { width: 25vw; min-height: 13vh; margin: 0; font-size: 4.6vh; }
 

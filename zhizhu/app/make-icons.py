@@ -1,4 +1,4 @@
-# 生成蜘蛛纸牌 APP 图标：绿呢底 + 白色「蛛」字。
+# 生成墩布纸牌 APP 图标：绿呢底 + 白色「墩」字。
 # 跑法：python make-icons.py
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -22,7 +22,7 @@ def load_font(size):
     return ImageFont.load_default()
 
 
-def draw_char(size, char='蛛'):
+def draw_char(size, char='墩'):
     """透明底 + 居中白字"""
     im = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
@@ -33,7 +33,7 @@ def draw_char(size, char='蛛'):
     return im
 
 
-def draw_tile(size, char='蛛'):
+def draw_tile(size, char='墩'):
     """绿底圆角方块 + 居中白字（老式图标用）"""
     im = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
