@@ -1,0 +1,12 @@
+{
+  "appId": "com.crazymonkey.zhizhu",
+  "appName": "蜘蛛纸牌",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#2c3e50"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

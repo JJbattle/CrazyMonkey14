@@ -17,6 +17,13 @@ tiaoqi/app/android/
 tiaoqi/app/*.apk
 tiaoqi/app/build-log.txt
 
+# ===== 蜘蛛纸牌打包（同样共用 app/.toolchain，本地产物不进 git）=====
+zhizhu/app/node_modules/
+zhizhu/app/www/
+zhizhu/app/android/
+zhizhu/app/*.apk
+zhizhu/app/build-log.txt
+
 # ===== 系统垃圾 =====
 .DS_Store
 Thumbs.db

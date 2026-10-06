@@ -1,0 +1,19 @@
+{
+  "name": "zhizhu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "蜘蛛纸牌手机版 —— 把 ../ 的网页版打成安卓 APK",
+  "scripts": {
+    "sync-web": "node sync.js",
+    "build": "node sync.js && cap sync android",
+    "apk": "node sync.js && cap sync android && cd android && gradlew.bat assembleDebug",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}

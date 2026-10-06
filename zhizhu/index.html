@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>蜘蛛纸牌</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ 主菜单 ============ -->
+    <div id="screen-menu" class="screen">
+      <div class="menu-title">蜘蛛纸牌</div>
+      <div class="menu-subtitle">字大 · 牌大 · 不催人</div>
+      <div class="menu-btns">
+        <button id="btn-continue" class="big-btn">继续游戏</button>
+        <button id="btn-new" class="big-btn">开始新游戏</button>
+        <button id="btn-settings" class="big-btn secondary">游戏设置</button>
+      </div>
+    </div>
+
+    <!-- ============ 难度选择 ============ -->
+    <div id="screen-difficulty" class="screen hidden">
+      <div class="setup-title">选择难度</div>
+      <div class="diff-list">
+        <button class="diff-card" data-d="0">
+          <div class="diff-name">简单</div>
+          <div class="diff-desc">1 花色 · 适合轻松游玩</div>
+        </button>
+        <button class="diff-card" data-d="1">
+          <div class="diff-name">普通</div>
+          <div class="diff-desc">2 花色 · 需要注意花色整理</div>
+        </button>
+        <button class="diff-card" data-d="2">
+          <div class="diff-name">困难</div>
+          <div class="diff-desc">4 花色 · 经典完整规则</div>
+        </button>
+      </div>
+      <button id="btn-diff-back" class="big-btn secondary">返回</button>
+    </div>
+
+    <!-- ============ 对局 ============ -->
+    <div id="screen-game" class="screen hidden">
+      <div id="game-top">
+        <div id="info">
+          <span id="info-diff" class="info-diff">简单 · 1花色</span>
+          <span id="info-time" class="info-item">时间 00:00</span>
+          <span id="info-moves" class="info-item">步数 0</span>
+        </div>
+        <div id="slots"></div>
+      </div>
+
+      <div id="game-mid">
+        <canvas id="board"></canvas>
+      </div>
+
+      <div id="game-bottom">
+        <div id="bottom-btns">
+          <button id="btn-undo" class="side-btn">悔棋</button>
+          <button id="btn-hint" class="side-btn">提示</button>
+          <button id="btn-menu" class="side-btn">菜单</button>
+        </div>
+        <button id="stock" class="stock">
+          <span id="stock-count" class="stock-count">5</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ 暂停菜单 ============ -->
+    <div id="overlay-menu" class="overlay hidden">
+      <div class="overlay-box">
+        <div class="overlay-title">菜单</div>
+        <button id="btn-resume" class="big-btn">继续游戏</button>
+        <button id="btn-menu-sound" class="big-btn secondary">音效：开</button>
+        <button id="btn-menu-vibrate" class="big-btn secondary">震动：开</button>
+        <button id="btn-menu-settings" class="big-btn secondary">游戏设置</button>
+        <button id="btn-restart" class="big-btn secondary">重新开始</button>
+        <button id="btn-exit" class="big-btn secondary">退出本局</button>
+      </div>
+    </div>
+
+    <!-- ============ 设置 ============ -->
+    <div id="overlay-settings" class="overlay hidden">
+      <div class="overlay-box">
+        <div class="overlay-title">游戏设置</div>
+
+        <div class="set-row"><span class="set-label">音效</span><button id="set-sound" class="toggle-btn on">开</button></div>
+        <div class="set-row"><span class="set-label">震动</span><button id="set-vibrate" class="toggle-btn on">开</button></div>
+
+        <div class="set-row"><span class="set-label">牌面大小</span>
+          <div class="seg-btns" id="set-cardsize">
+            <button class="seg-btn" data-v="0">小</button>
+            <button class="seg-btn on" data-v="1">中</button>
+            <button class="seg-btn" data-v="2">大</button>
+          </div>
+        </div>
+
+        <div class="set-row"><span class="set-label">动画速度</span>
+          <div class="seg-btns" id="set-animspeed">
+            <button class="seg-btn" data-v="0">慢</button>
+            <button class="seg-btn on" data-v="1">正常</button>
+            <button class="seg-btn" data-v="2">快</button>
+          </div>
+        </div>
+
+        <div class="set-row"><span class="set-label">点击移动</span><button id="set-click" class="toggle-btn on">开</button></div>
+        <div class="set-row"><span class="set-label">拖动移动</span><button id="set-drag" class="toggle-btn on">开</button></div>
+
+        <button id="btn-tutorial" class="big-btn secondary">重新查看玩法</button>
+        <button id="btn-settings-back" class="big-btn">返回</button>
+      </div>
+    </div>
+
+    <!-- ============ 结算 ============ -->
+    <div id="overlay-win" class="overlay hidden">
+      <div class="overlay-box">
+        <div class="overlay-title">恭喜完成！</div>
+        <div id="win-sub" class="win-sub"></div>
+        <div id="win-btns">
+          <button id="btn-win-again" class="big-btn">再来一局</button>
+          <button id="btn-win-home" class="big-btn secondary">返回主页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 走不下去 ============ -->
+    <div id="overlay-stuck" class="overlay hidden">
+      <div class="overlay-box">
+        <div class="overlay-title">这局好像走不下去了</div>
+        <div class="win-sub">可以悔棋，或者重新开始</div>
+        <div id="stuck-btns">
+          <button id="btn-stuck-undo" class="big-btn">悔棋</button>
+          <button id="btn-stuck-restart" class="big-btn secondary">重新开始</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 新手教学 ============ -->
+    <div id="overlay-tutorial" class="overlay hidden">
+      <div class="overlay-box tutorial-box">
+        <div class="overlay-title">怎么玩</div>
+        <div class="tut-step"><span class="tut-num">1</span> 把小一点的牌，放到大一点的牌下面（比如 8 放到 9 下面）</div>
+        <div class="tut-step"><span class="tut-num">2</span> 同花色、点数连着的牌，可以一起移动</div>
+        <div class="tut-step"><span class="tut-num">3</span> 从 K 一直排到 A，就能收走一整组</div>
+        <div class="tut-step"><span class="tut-num">4</span> 桌面没有空位时，点右下角牌库发新牌</div>
+        <button id="btn-tutorial-close" class="big-btn">开始玩</button>
+      </div>
+    </div>
+
+    <!-- ============ 提示浮字 ============ -->
+    <div id="toast" class="toast hidden"></div>
+    <div id="cheer" class="cheer hidden"></div>
+
+  </div>
+
+  <script src="js/cards.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
