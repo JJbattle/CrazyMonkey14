@@ -236,18 +236,20 @@
     // 选中：跑动高亮 + 合法目标
     if (sel) {
       const col = state.tableau[sel.col], geo = geos[sel.col];
-      const run = col.slice(sel.idx);
-      for (let idx = sel.idx; idx < col.length; idx++) {
-        strokeRect(colX(sel.col), geo.tops[idx], cardW, cardH, '#ffd34d', 3);
-      }
-      for (let t = 0; t < 10; t++) {
-        if (t === sel.col) continue;
-        if (R.canPlaceOn(run[0], state.tableau[t])) {
-          if (state.tableau[t].length) {
-            const g = geos[t], top = state.tableau[t].length - 1;
-            ctx.save(); ctx.globalAlpha = 0.35; roundRect(colX(t), g.tops[top], cardW, cardH, cardW * 0.12); ctx.fillStyle = '#7be08a'; ctx.fill(); ctx.restore();
-          } else {
-            strokeRect(colX(t), anchorTop, cardW, cardH, '#7be08a', 3, [6, 4]);
+      const run = R.movableStack(col, sel.idx); // 只框真正能一起移动的同花降序牌组
+      if (run) {
+        for (let k = 0; k < run.length; k++) {
+          strokeRect(colX(sel.col), geo.tops[sel.idx + k], cardW, cardH, '#ffd34d', 3);
+        }
+        for (let t = 0; t < 10; t++) {
+          if (t === sel.col) continue;
+          if (R.canPlaceOn(run[0], state.tableau[t])) {
+            if (state.tableau[t].length) {
+              const g = geos[t], top = state.tableau[t].length - 1;
+              ctx.save(); ctx.globalAlpha = 0.35; roundRect(colX(t), g.tops[top], cardW, cardH, cardW * 0.12); ctx.fillStyle = '#7be08a'; ctx.fill(); ctx.restore();
+            } else {
+              strokeRect(colX(t), anchorTop, cardW, cardH, '#7be08a', 3, [6, 4]);
+            }
           }
         }
       }
@@ -256,9 +258,11 @@
     if (hintMove && performance.now() < hintUntil) {
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
       const col = state.tableau[hintMove.from], geo = geos[hintMove.from];
-      for (let idx = hintMove.fromIdx; idx < col.length; idx++) {
+      const run = R.movableStack(col, hintMove.fromIdx);
+      const n = run ? run.length : (col.length - hintMove.fromIdx);
+      for (let k = 0; k < n; k++) {
         ctx.save(); ctx.globalAlpha = 0.4 + 0.4 * pulse;
-        roundRect(colX(hintMove.from), geo.tops[idx], cardW, cardH, cardW * 0.12); ctx.fillStyle = '#ffb13d'; ctx.fill(); ctx.restore();
+        roundRect(colX(hintMove.from), geo.tops[hintMove.fromIdx + k], cardW, cardH, cardW * 0.12); ctx.fillStyle = '#ffb13d'; ctx.fill(); ctx.restore();
       }
       const g2 = geos[hintMove.to];
       const ty = state.tableau[hintMove.to].length ? g2.tops[state.tableau[hintMove.to].length - 1] : anchorTop;
@@ -343,6 +347,7 @@
     if (!state || state.status !== 'playing') return;
     if (busy) return;
     if (!S.dragMove && !S.clickMove) return;
+    hide = null; ghostCards = null; // 清理上次拖拽可能残留的状态，防止牌消失
     const pt = canvasPoint(e);
     const hit = hitTest(pt.x, pt.y);
     if (!hit || hit.idx < 0) { clearSel(); return; }
@@ -364,17 +369,18 @@
     if (!run) return;
     const geo = geoFor(col);
     hide = { col: down.col, fromIdx: down.idx, count: run.length };
-    const baseX = pt.x - down.grabDx, baseY = pt.y - down.grabDy;
+    // 把拖拽的牌限制在画布内，别让牌被拖出屏幕「消失」
+    const baseX = Math.max(0, Math.min(W - cardW, pt.x - down.grabDx));
+    const baseY = Math.max(0, Math.min(H - cardH, pt.y - down.grabDy));
     const top0 = geo.tops[down.idx];
     ghostCards = run.map((c, k) => ({ card: c, x: baseX, y: baseY + (geo.tops[down.idx + k] - top0) }));
     render();
   });
 
-  canvas.addEventListener('pointerup', e => {
+  function endDrag(pt) {
     if (!down || !state) return;
-    const pt = canvasPoint(e);
-    const wasDrag = down.moved;
     const from = down.col, fromIdx = down.idx;
+    const wasDrag = down.moved;
     down = null;
     if (wasDrag) {
       const to = columnAt(pt.x);
@@ -392,9 +398,15 @@
       handleTap(pt.x, pt.y);
     }
     render();
-  });
+  }
 
+  canvas.addEventListener('pointerup', e => endDrag(canvasPoint(e)));
   canvas.addEventListener('pointercancel', () => { down = null; hide = null; ghostCards = null; render(); });
+
+  // 兜底：手指在画布外松手（或 capture 失效）时，canvas 收不到 pointerup，
+  // 用 window 级监听收尾，保证拖拽状态一定被清理，牌不会悬空/消失导致「卡死」。
+  window.addEventListener('pointerup', e => endDrag(canvasPoint(e)));
+  window.addEventListener('pointercancel', () => { down = null; hide = null; ghostCards = null; render(); });
 
   function handleTap(x, y) {
     if (!state || state.status !== 'playing') return;
