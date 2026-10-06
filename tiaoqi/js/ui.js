@@ -61,11 +61,21 @@
     [screenMenu, screenSetup, screenGame].forEach(s => s.classList.add('hidden'));
     el.classList.remove('hidden');
   }
-  function goMenu() { screen = 'menu'; show(screenMenu); refreshMenu(); }
+  function goMenu() {
+    screen = 'menu';
+    // 关键：回主菜单前先把所有覆盖层关掉，否则弹窗（尤其结算弹窗）还盖在菜单上，
+    // 看着就像「点了返回却没反应」。
+    overlayWin.classList.add('hidden');
+    overlayMenu.classList.add('hidden');
+    overlayDebug.classList.add('hidden');
+    show(screenMenu);
+    refreshMenu();
+  }
 
   // ---------- 主菜单 ----------
   function refreshMenu() {
     $('btn-continue').classList.toggle('hidden', !hasSave());
+    renderStats();
   }
   function hasSave() {
     try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
@@ -102,6 +112,36 @@
   // ---------- 设置屏 ----------
   const DIFF_NAMES = { easy: '简单', normal: '普通', hard: '困难', expert: '专家' };
   const DIFF_ORDER = ['easy', 'normal', 'hard', 'expert'];
+
+  // —— 胜利统计（按难度；steps 是这些胜利的步数总和，用来算平均）——
+  const STATS_KEY = 'tiaoqi-stats-v1';
+  function loadStats() {
+    const base = { easy: { win: 0, steps: 0 }, normal: { win: 0, steps: 0 }, hard: { win: 0, steps: 0 }, expert: { win: 0, steps: 0 } };
+    try {
+      const s = JSON.parse(localStorage.getItem(STATS_KEY) || 'null') || {};
+      for (const lv of DIFF_ORDER) { if (!s[lv]) s[lv] = { win: 0, steps: 0 }; }
+      return s;
+    } catch (e) { return JSON.parse(JSON.stringify(base)); }
+  }
+  function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (e) {} }
+  function recordWin(level, steps) {
+    const s = loadStats();
+    s[level].win++;
+    s[level].steps += steps;
+    saveStats(s);
+  }
+  function renderStats() {
+    const el = $('stats');
+    if (!el) return;
+    const s = loadStats();
+    const total = DIFF_ORDER.reduce((a, lv) => a + s[lv].win, 0);
+    if (total === 0) { el.textContent = '还没有赢过，加油！'; return; }
+    const parts = DIFF_ORDER.filter(lv => s[lv].win > 0).map(lv => {
+      const d = s[lv];
+      return DIFF_NAMES[lv] + ' 赢 ' + d.win + ' 局（均 ' + Math.round(d.steps / d.win) + ' 步）';
+    });
+    el.textContent = '胜利：' + parts.join('　');
+  }
 
   function renderSetup() {
     const countWrap = $('count-btns');
@@ -623,8 +663,15 @@
 
   // ---------- 结算 ----------
   function showWinOverlay(finisher) {
-    winTitle.textContent = (finisher === 0) ? '你赢啦！' : (game.players[finisher].name + '方赢啦！');
-    winSub.textContent = '是否继续观看其他玩家？';
+    if (finisher === 0) {
+      const steps = game.history.filter(e => e.player === 0).length;
+      recordWin(aiLevel, steps);
+      winTitle.textContent = '你赢啦！';
+      winSub.textContent = '共走了 ' + steps + ' 步，是否继续观看其他玩家？';
+    } else {
+      winTitle.textContent = game.players[finisher].name + '方赢啦！';
+      winSub.textContent = '是否继续观看其他玩家？';
+    }
     winBtns.innerHTML = '';
     winBtns.appendChild(mkBtn('继续观看', () => { hideWin(); }));
     winBtns.appendChild(mkBtn('结束游戏', () => { clearSave(); goMenu(); }, true));

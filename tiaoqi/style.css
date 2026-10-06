@@ -52,7 +52,8 @@ body {
 
 /* ---------- 主菜单（横屏：大标题在上，三个按钮横排） ---------- */
 .menu-title { font-size: 18vh; font-weight: bold; letter-spacing: 0.12em; margin-bottom: 0.5vh; }
-.menu-subtitle { font-size: 4vh; color: #b8c4d0; margin-bottom: 3vh; }
+.menu-subtitle { font-size: 4vh; color: #b8c4d0; margin-bottom: 2.4vh; }
+.menu-stats { font-size: 3.2vh; color: #9fb0c0; margin-bottom: 2.4vh; text-align: center; line-height: 1.5; max-width: 92vw; }
 .menu-btns { display: flex; flex-direction: row; justify-content: center; gap: 3vw; }
 .menu-btns .big-btn {
   width: 26vw; min-height: 13vh; margin: 0; font-size: 5.5vh; letter-spacing: 6px;
