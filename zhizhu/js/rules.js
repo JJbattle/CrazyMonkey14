@@ -14,29 +14,24 @@
     return card.r + 1 === topCard(targetCol).r;
   }
 
-  // 从 idx 起能整体移动的连续牌组（同花色、逐张递减）。返回 [idx..end] 切片或 null。
+  // 从 idx 到列顶能否作为一整组移动（同花色、逐张递减，且必须延伸到列顶）。
+  // 中间只要有断裂（异花/点数不对/背面），整组就不能动，返回 null。
+  // 否则会把中间或底部的牌单独抽走、上面的牌悬空。
   function movableStack(col, idx) {
     if (idx < 0 || idx >= col.length || !col[idx].u) return null;
-    let end = idx;
     for (let i = idx; i < col.length - 1; i++) {
       const a = col[i], b = col[i + 1];
-      if (b.u && a.s === b.s && a.r === b.r + 1) end = i + 1;
-      else break;
+      if (!b.u || a.s !== b.s || a.r !== b.r + 1) return null;
     }
-    return col.slice(idx, end + 1);
+    return col.slice(idx);
   }
 
-  // 每列「可移动牌组顶端」的下标（单张也算一组）。用于枚举走法、点选。
+  // 每列所有能作为「移动起点」的下标：从该张到列顶必须整段可动（见 movableStack）。
+  // 用于枚举走法、提示、无路可走判断。
   function runTops(col) {
     const tops = [];
     for (let i = 0; i < col.length; i++) {
-      const c = col[i];
-      if (!c.u) continue;
-      if (i > 0) {
-        const above = col[i - 1];
-        if (above.u && above.s === c.s && above.r === c.r + 1) continue; // 属于上方那组，不是顶端
-      }
-      tops.push(i);
+      if (movableStack(col, i)) tops.push(i);
     }
     return tops;
   }

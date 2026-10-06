@@ -450,6 +450,7 @@
     // 再次点同一张牌：若只有一个明显目标 → 智能移动；否则取消选中
     if (sel && sel.col === hit.col && sel.idx === hit.idx) {
       const run = R.movableStack(col, hit.idx);
+      if (!run) { clearSel(); return; }
       const targets = legalTargets(sel.col, run);
       if (targets.length === 1) { tryMoveToColumn(targets[0]); }
       else { clearSel(); }
@@ -463,7 +464,8 @@
         return;
       }
     }
-    // 否则选中这张牌（从它往上的同花连续牌组）
+    // 否则选中这张牌（从它到列顶的同花连续牌组）；不能整体移动的牌不选中
+    if (!R.movableStack(col, hit.idx)) { clearSel(); return; }
     sel = { col: hit.col, idx: hit.idx };
     sfx('select'); render();
   }

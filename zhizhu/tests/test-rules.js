@@ -57,10 +57,26 @@ console.log('\n[4] 连续牌组移动');
 {
   const c = col(SP, [9, 8, 7]);
   ok(Rules.movableStack(c, 0).length === 3, '同花连续三张可整体移动');
+
+  // 异花断裂在中间：整组不能动（不能把底部/中间的牌单独抽走、上面的牌悬空）
   const c2 = [mk(SP, 9, 1), mk(HT, 8, 1), mk(SP, 7, 1)];
-  ok(Rules.movableStack(c2, 0).length === 1, '异花色中间断开：只能移动顶上一张');
+  ok(Rules.movableStack(c2, 0) === null, '异花断裂：点底部 ♠9 不能单独抽走');
+  ok(Rules.movableStack(c2, 1) === null, '异花断裂：点中间 ♥8（上面 ♠7 异花）不能动');
+  ok(Rules.movableStack(c2, 2).length === 1, '点顶牌 ♠7 单张可动');
+
+  // 用户报告的场景：♠3 压在异花 ♥2 下，不能把 ♠3 单独挪走
+  const c4 = [mk(SP, 3, 1), mk(HT, 2, 1), mk(HT, 1, 1)];
+  ok(Rules.movableStack(c4, 0) === null, '♠3 压在 ♥2 下：点 ♠3 不能单独挪走');
+  ok(Rules.movableStack(c4, 1).length === 2, '点 ♥2 可带 ♥A 一起动（同花降序到顶）');
+
   const c3 = [mk(SP, 9, 1), mk(SP, 8, 1)];
-  ok(Rules.movableStack(c3, 1).length === 1, '点底牌只动一张');
+  ok(Rules.movableStack(c3, 1).length === 1, '点顶牌单张只动一张');
+
+  // runTops 只列出「能整段移动到顶」的起点
+  const colA = [mk(SP, 3, 1), mk(HT, 2, 1), mk(HT, 1, 1)];
+  ok(JSON.stringify(Rules.runTops(colA)) === JSON.stringify([1, 2]), 'runTops 排除不能单独抽走的底部牌');
+  const colB = col(SP, [9, 8, 7]);
+  ok(JSON.stringify(Rules.runTops(colB)) === JSON.stringify([0, 1, 2]), '全同花列每一张都能当移动起点');
 }
 
 console.log('\n[5] 空列发牌限制');
