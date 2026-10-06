@@ -183,9 +183,10 @@
     const red = (card.s === 1 || card.s === 3);
     const color = red ? '#c0392b' : '#1a1a1a';
     const rank = C.rankText(card.r), suit = C.SUITS[card.s];
-    const isTop = (visibleH >= h - 1);
     const fs = Math.max(9, Math.min(h * 0.30, visibleH * 0.78));
 
+    // 卡面只留「一个数 + 一个花色」，叠在左上角（牌竖着叠，重叠时只露这一条），
+    // 不画中间大水印，看着清爽不眼晕。
     ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     ctx.fillStyle = color;
     ctx.font = 'bold ' + fs + 'px Arial, "Segoe UI", sans-serif';
@@ -194,16 +195,6 @@
     const rw = ctx.measureText(rank).width;
     ctx.font = fs * 0.85 + 'px Arial, "Segoe UI", sans-serif';
     ctx.fillText(suit, px + rw + w * 0.04, py + h * 0.02);
-
-    // 中间大花色（只有整张可见的顶牌才画，避免压住被遮住的部分）
-    if (isTop && h > 40) {
-      ctx.globalAlpha = 0.14;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = (h * 0.52) + 'px Arial, "Segoe UI", sans-serif';
-      ctx.fillStyle = color;
-      ctx.fillText(suit, x + w * 0.63, y + h * 0.52);
-      ctx.globalAlpha = 1;
-    }
   }
   function drawCard(x, y, w, h, card, visibleH) {
     if (card.u) drawCardFace(x, y, w, h, card, visibleH);
