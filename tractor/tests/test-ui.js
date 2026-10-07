@@ -1019,6 +1019,61 @@ function textOf(el) {
   ok('出成了就不弹红条', !els['banner'].classList.contains('on'), els['banner'].className);
 }
 
+// ---------- 19) 手牌优先：屏幕矮时撑高手牌区、压牌桌，别裁掉最后一行 ----------
+{
+  // handNeedHeight：按整张大小（52×74）算出手牌需要多高（已含 HAND_PAD）
+  const full = [{ n: 8 }, { n: 6 }, { n: 6 }, { n: 5 }];   // 25 张
+  ok('25 张在横屏宽下只需要一行高（整张大小）',
+     handNeedHeight(full, 900) === 74 + HAND_PAD, '=' + handNeedHeight(full, 900));
+  // 窄屏一行塞不下，要换行，需要的高度自然更高
+  ok('25 张在窄屏上需要的高度比宽屏高（会换行）',
+     handNeedHeight(full, 320) > handNeedHeight(full, 900),
+     handNeedHeight(full, 320) + ' vs ' + handNeedHeight(full, 900));
+
+  // applyHandHeight：摆一手 25 张牌，模拟矮屏（body 高 300，横屏小手机那种）。
+  // 40% 只有 120px，摆不下两行整张牌；手牌区必须被撑得比 40% 还高。
+  const g = game;
+  const saved = { seat: g.humanSeat, hand: g.hands[0], trump: g.trumpSuit, level: g.levelRank };
+  g.humanSeat = 0;
+  g.trumpSuit = 'H'; g.levelRank = 2;
+  const deal = [];
+  for (let r = 3; r <= 10; r++) deal.push(C('H', r));
+  for (let r = 3; r <= 8; r++) deal.push(C('S', r));
+  for (let r = 3; r <= 8; r++) deal.push(C('D', r));
+  for (let r = 3; r <= 7; r++) deal.push(C('C', r));
+  g.hands[0] = deal;
+
+  els['body'].clientHeight = 300;
+  els['hand'].clientWidth = 640;
+  $('hand-bar');   // 先让假 DOM 把它建出来，再补上高度
+  els['hand-bar'].offsetHeight = 50;
+  applyHandHeight();
+  const minH = parseFloat(els['seat-bottom'].style.minHeight);
+  ok('矮屏上手牌区被撑得比 40%（120px）还高，不再裁最后一行',
+     minH > 120, 'min-height=' + minH);
+  ok('牌桌还保得住最矮高度（没被压没）',
+     300 - minH >= TABLE_FLOOR, '牌桌剩 ' + (300 - minH) + 'px');
+
+  // 只剩一张牌时也要撑到够摆下整张大小，否则这张会被裁掉
+  g.hands[0] = [C('S', 3)];
+  applyHandHeight();
+  const oneH = parseFloat(els['seat-bottom'].style.minHeight);
+  ok('只剩一张牌时也撑得下整张大小（不被裁）',
+     oneH >= 74 + HAND_PAD + 50 + SEAT_BOTTOM_PAD, 'min-height=' + oneH);
+
+  // 一张不剩就不设 min-height，交给 CSS 的 40% 兜底
+  g.hands[0] = [];
+  applyHandHeight();
+  ok('没牌时不设 min-height', !els['seat-bottom'].style.minHeight,
+     'min-height=' + els['seat-bottom'].style.minHeight);
+
+  g.humanSeat = saved.seat; g.hands[0] = saved.hand;
+  g.trumpSuit = saved.trump; g.levelRank = saved.level;
+  els['body'].clientHeight = undefined;
+  els['hand'].clientWidth = undefined;
+  els['hand-bar'].offsetHeight = undefined;
+}
+
 console.log('界面冒烟测试：通过 ' + pass + ' / 失败 ' + fail);
 `;
 

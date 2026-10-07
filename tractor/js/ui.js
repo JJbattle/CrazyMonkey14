@@ -37,10 +37,12 @@ function trumpName(ts) {
 }
 
 function render() {
-  // 这两件都必须排在最前面：它们一个决定手牌区占多高、一个决定牌桌占多宽，
+  // 这三件都必须排在最前面：前两个一个决定手牌区占多高、一个决定牌桌占多宽，
+  // applyHandHeight 再按手里的牌把「手牌区该多高」落到实处（必要时压牌桌），
   // 而 renderHand / renderTrick 都要先量了地方才知道牌该摆多大。
   applyDiscardMode();
   applySideFold();
+  applyHandHeight();
   renderInfo();
   renderPlayers();
   renderSeats();
@@ -71,6 +73,33 @@ function applySideFold() {
     b.textContent = sideFolded ? '战报 ▸' : '收起 ◂';
     b.title = sideFolded ? '点开看每轮都发生了什么' : '把战报收起来，牌桌更宽敞';
   }
+}
+
+// 手牌优先：先保证手里的牌全摆得下（撑高手牌区、必要时压矮牌桌），
+// 剩下的地方再给牌桌。以前手牌区写死占 40%，屏幕一矮最后一行就被裁掉；
+// 现在按「手里到底有几张牌」现算需要多高，把 min-height 顶上去，牌桌自然往下压。
+// 必须在 renderHand 之前跑——renderHand 要先量了地方才知道牌该摆多大。
+function applyHandHeight() {
+  const seatBottom = $('seat-bottom');
+  const hand = $('hand');
+  const body = $('body');
+  if (!seatBottom || !seatBottom.style || !hand || !body) return;
+  const cards = game.hands[game.humanSeat];
+  if (!cards || !cards.length) { seatBottom.style.minHeight = ''; return; }
+
+  const bodyH = body.clientHeight;
+  if (!bodyH) return;   // 还没布局好（测试环境量不到）就不插手，保持 CSS 默认
+
+  const ts = handTrumpSuit();
+  const sorted = sortHand(cards, ts, game.levelRank);
+  const groups = groupHand(sorted, ts).map(r => ({ n: r.length }));
+
+  const handBar = $('hand-bar');
+  const handBarH = (handBar && handBar.offsetHeight) || 0;
+  // 牌桌最多被压到 TABLE_FLOOR 那么矮，再压出牌区就没地方摆了
+  const maxHandH = Math.max(40, bodyH - TABLE_FLOOR - handBarH - SEAT_BOTTOM_PAD);
+  const need = Math.min(handNeedHeight(groups, hand.clientWidth), maxHandH);
+  seatBottom.style.minHeight = Math.ceil(need + handBarH + SEAT_BOTTOM_PAD) + 'px';
 }
 
 function renderInfo() {
@@ -285,6 +314,32 @@ const HAND_PAD = 24;
 const HAND_MIN_FACE = 26;    // 叠到最紧时每张牌至少露这么宽，保证点数看得清
 const HAND_SCALES = [1, 0.95, 0.9, 0.85, 0.8, 0.75];   // 塞不下就按这些比例缩小
 const HAND_FALLBACK_W = 900, HAND_FALLBACK_H = 130;    // 量不到大小时的兜底（横屏手机）
+// 手牌区下面那条（头像+按钮）会占一点高，上面是 #hand，最底下还有条内边距。
+// 算「手牌区该给多高」时要把这俩一并算进去，跟 style.css 对得上。
+const SEAT_BOTTOM_PAD = 4;   // #seat-bottom 的下内边距（padding: 0 5px 4px）
+const TABLE_FLOOR = 96;      // 手牌再挤也不许把牌桌压得比这还矮（= #trick 的 min-height）
+
+// 一手牌按牌面大小和重叠量摆，需要几行（一个花色组不能拆到两行去，整组一起换行）
+function handRows(groups, W, cardW, ov) {
+  let rows = 1, cur = 0;
+  for (const g of groups) {
+    const gw = cardW + (g.n - 1) * (cardW + ov);
+    if (cur > 0 && cur + HAND_GAP + gw > W) { rows++; cur = gw; }
+    else cur += (cur > 0 ? HAND_GAP : 0) + gw;
+  }
+  return rows;
+}
+
+// 手牌摆满（一整副 25 张、扣底 33 张）**至少**需要多高：按整张大小（52×74）、
+// 组内叠到最紧来算，返回的高度已经含 HAND_PAD 上下留白。
+// 这是「手牌优先」的下限——低于它，最后一行就会被 overflow 裁掉。
+// （屏幕矮、要压牌桌时就把手牌区撑到这个高度；实在撑不到就整手缩一号。）
+function handNeedHeight(groups, availW) {
+  const W = Math.max(80, (availW || HAND_FALLBACK_W) - HAND_PAD);
+  const minOv = -(HAND_CARD_W - Math.max(HAND_MIN_FACE, Math.round(HAND_CARD_W * 0.5)));
+  const rows = handRows(groups, W, HAND_CARD_W, minOv);
+  return rows * HAND_CARD_H + (rows - 1) * HAND_ROW_GAP + HAND_PAD;
+}
 
 // groups: [{ n: 这个花色有几张 }]
 // 返回 { cardW, cardH, ov, rows, scale, fits }
@@ -292,25 +347,13 @@ function planHandLayout(groups, availW, availH) {
   const W = Math.max(80, (availW || HAND_FALLBACK_W) - HAND_PAD);
   const H = Math.max(40, (availH || HAND_FALLBACK_H) - HAND_PAD);
 
-  // 按这个牌面大小和重叠量，需要几行？
-  const rowsWith = (cardW, ov) => {
-    let rows = 1, cur = 0;
-    for (const g of groups) {
-      const gw = cardW + (g.n - 1) * (cardW + ov);
-      // 一个花色组不能拆到两行去，所以整组一起换行
-      if (cur > 0 && cur + HAND_GAP + gw > W) { rows++; cur = gw; }
-      else cur += (cur > 0 ? HAND_GAP : 0) + gw;
-    }
-    return rows;
-  };
-
   for (const scale of HAND_SCALES) {
     const cardW = Math.round(HAND_CARD_W * scale);
     const cardH = Math.round(HAND_CARD_H * scale);
     const maxRows = Math.max(1, Math.floor((H + HAND_ROW_GAP) / (cardH + HAND_ROW_GAP)));
     const minOv = -(cardW - Math.max(HAND_MIN_FACE, Math.round(cardW * 0.5)));
     for (let ov = 0; ov >= minOv; ov--) {
-      const r = rowsWith(cardW, ov);
+      const r = handRows(groups, W, cardW, ov);
       if (r <= maxRows) return { cardW, cardH, ov, rows: r, scale, fits: true };
     }
   }
@@ -321,7 +364,7 @@ function planHandLayout(groups, availW, availH) {
   const cardW = Math.round(HAND_CARD_W * scale);
   const cardH = Math.round(HAND_CARD_H * scale);
   const ov = -(cardW - HAND_MIN_FACE);
-  return { cardW, cardH, ov, rows: rowsWith(cardW, ov), scale, fits: false };
+  return { cardW, cardH, ov, rows: handRows(groups, W, cardW, ov), scale, fits: false };
 }
 
 // ---------- 出牌区：那几张牌能摆多大 ----------
@@ -415,18 +458,15 @@ function fitTrickCards(box, plays) {
   box.style.setProperty('--tj', Math.max(10, Math.round(plan.cardW * 0.27)) + 'px');
 }
 
-function renderHand() {
-  const box = $('hand');
-  box.innerHTML = '';
-  if (!game.hands[game.humanSeat]) return;
-  // 发牌中主花色还没锁死（别人随时能反主），但已经有人亮主了：
-  // 先按亮的那门当临时主花色排，让主级牌立即提到最前——
-  // 亮草花时两张草花2 都得一起排到所有 2 前面，不能只提前一张。
-  const ts = game.trumpSuit != null ? game.trumpSuit
+// 现在定的主花色。发牌中主还没锁死（别人随时能反主）时，
+// 已经有人亮主了，就先把亮的那门当临时主花色排，让主级牌立即提到最前。
+function handTrumpSuit() {
+  return game.trumpSuit != null ? game.trumpSuit
     : (game.phase === 'dealing' && game.bid && game.bid.kind !== 'jokers' ? game.bid.suit : null);
-  const hand = sortHand(game.hands[game.humanSeat], ts, game.levelRank);
+}
 
-  // 先按花色分组（主牌在最前，然后黑红梅方，顺序见 sortHand）
+// 手牌按花色分组成 [{ c, isT }, ...] 的列表：主牌在最前，然后黑红梅方（顺序见 sortHand）
+function groupHand(hand, ts) {
   const rows = [];
   let lastKey = null;
   for (const c of hand) {
@@ -435,6 +475,18 @@ function renderHand() {
     if (key !== lastKey) { rows.push([]); lastKey = key; }
     rows[rows.length - 1].push({ c, isT });
   }
+  return rows;
+}
+
+function renderHand() {
+  const box = $('hand');
+  box.innerHTML = '';
+  if (!game.hands[game.humanSeat]) return;
+  const ts = handTrumpSuit();
+  const hand = sortHand(game.hands[game.humanSeat], ts, game.levelRank);
+
+  // 先按花色分组（主牌在最前，然后黑红梅方，顺序见 sortHand）
+  const rows = groupHand(hand, ts);
 
   // 算出该怎么叠，保证所有的牌一眼全看得见
   const groups = rows.map(r => ({ n: r.length }));
