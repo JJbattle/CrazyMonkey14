@@ -29,7 +29,7 @@ function testMultiHumanFullRound() {
   g.humanNames = { 0: '妈妈', 2: '阿姨' };
   g.assignNames();
   ok('两个真人名字正确', g.names[0] === '妈妈' && g.names[2] === '阿姨');
-  ok('对家不是墩布（联网）', g.names[2] !== '墩布' && g.names[1] !== '墩布');
+  ok('对家不是墩布（联网，2 号是真人）', g.names[2] !== '墩布');
 
   g.newGame();
   // 发牌：一次性发完（真人发牌中不亮主，AI 会自动亮）

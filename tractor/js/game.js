@@ -12,8 +12,8 @@ function nextLevel(l) { return l >= MAX_LEVEL ? 2 : l + 1; }
 // 你自己：固定名字，**不参与随机**。想改成别的（比如「妈妈」）就改这一行。
 const HUMAN_NAME = '你';
 
-const CAT_NAME = '墩布';            // 家里的猫，**永远坐对家**，只会喵喵叫
-// 陪玩名册：每局随机抽两个坐上另外两家，一局一换。这里全都是电脑。
+const CAT_NAME = '墩布';            // 家里的猫：单机永远坐对家，联网也进 AI 池当陪玩；只会喵喵叫
+// 陪玩名册：每局随机抽两个坐上 AI 位（单机/联网），一局一换。这里全都是电脑。
 const PLAYER_POOL = ['尹天乱', '李淑静', '张文霞', '卢志鸿', '蒋学清'];
 
 // ---------- AI 打法档案 ----------
@@ -51,7 +51,7 @@ const AI_PROFILES = {
   },
 };
 
-// 陪玩名册 → 打法（对家墩布固定 steady，不在这表里）
+// 陪玩名册 → 打法（墩布固定 steady，单独特判，不在这表里）
 const NAME_PROFILE = {
   '尹天乱': 'sharp',
   '李淑静': 'balanced',
@@ -142,8 +142,11 @@ class Game {
   //   对家     —— 永远是墩布（家里的猫）
   //   另外两家 —— 从陪玩名册里随机抽两个，一局一换
   assignNames() {
-    const pool = shuffle(PLAYER_POOL.slice());
     const single = this.humanSeats.size === 1;
+    // 单机：对家固定是猫墩布，陪玩池不含它（免得 1/3 号也出猫）；
+    // 联网：墩布也进池，能当 AI 坐 1/3 号那两个空位。
+    const base = single ? PLAYER_POOL : [CAT_NAME].concat(PLAYER_POOL);
+    const pool = shuffle(base.slice());
     const partner = (this.humanSeat + 2) % 4;      // 单机时对家 = 墩布（隔两个座位）
     this.names = [];
     for (const s of [0, 1, 2, 3]) {
