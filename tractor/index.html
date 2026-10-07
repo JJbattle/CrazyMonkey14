@@ -29,16 +29,16 @@
   </div>
   <div id="app">
     <div id="info-bar">
+      <!-- 退出：只在联网时显示，退回主界面。单机隐藏。放最左边，避开右上角的电量/信号状态栏 -->
+      <button id="exit" class="hidden">退出</button>
       <div class="info-item" id="dealer-info">坐庄：你（你方）</div>
       <div class="info-item" id="level-info">本局打：2</div>
       <div class="info-item" id="trump-info">主牌：未定</div>
       <div class="info-item toggle" id="hurdle-info">5/10/K 必打：开</div>
       <!-- 操作提示（轮到你出牌 / 扣底 / 发牌中…）放这：必打和重开之间 -->
       <div id="status"></div>
-      <!-- 重新开局：放在顶栏最右边（退出按钮左边）。单机=直接重开；联网=发起投票，对方同意才重开 -->
+      <!-- 重新开局：放在顶栏最右边。单机=直接重开；联网=发起投票，对方同意才重开 -->
       <button id="restart">重新开局</button>
-      <!-- 退出：只在联网时显示，退回主界面。单机隐藏 -->
-      <button id="exit" class="hidden">退出</button>
     </div>
 
     <div id="body">

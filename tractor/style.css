@@ -27,9 +27,6 @@ body {
   flex-wrap: wrap;
   gap: 4px 14px;
   padding: 6px 10px;
-  /* 手机状态栏（电量/信号）会盖在顶栏上，把内容往下挪一个按钮高度，
-     别让「重新开局 / 退出」跟状态栏叠在一起。env() 在安卓返回 0，就按 24px 兜底。 */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 24px);
   background: rgba(0, 0, 0, 0.25);
   font-size: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
