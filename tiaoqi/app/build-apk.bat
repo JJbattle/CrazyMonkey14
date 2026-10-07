@@ -69,12 +69,12 @@ if not "%RC%"=="0" (
 )
 
 echo.
-echo 把成品复制到 app 目录 ...
-copy /y "android\app\build\outputs\apk\debug\app-debug.apk" "跳棋.apk" >nul
+echo 把成品复制到 _安装包 目录 ...
+copy /y "android\app\build\outputs\apk\debug\app-debug.apk" "..\..\_安装包\跳棋.apk" >nul
 
 echo.
 echo ============================================
 echo   打包成功！
-echo   成品： %~dp0跳棋.apk
+echo   成品： %~dp0..\..\_安装包\跳棋.apk
 echo ============================================
 pause
