@@ -21,6 +21,7 @@ class Room {
     this.seq = 0;
     this.timer = null;
     this.bidSkipped = new Set();  // 已经给过亮主机会、暂不重复提醒的真人
+    this.restartWanted = new Set();  // 已经点了「重开」、等对方同意的真人
     this.started = false;
     this.stopping = false;
   }
@@ -43,6 +44,7 @@ class Room {
       case 'passBid': this.onPassBid(ws); break;
       case 'doDiscard': this.onDiscard(ws, msg); break;
       case 'playCards': this.onPlay(ws, msg); break;
+      case 'restart': this.onRestart(ws); break;
     }
   }
 
@@ -81,6 +83,7 @@ class Room {
   startGame() {
     this.started = true;
     this.bidSkipped.clear();
+    this.restartWanted.clear();
     this.game.newGame();   // 洗牌，phase='dealing'
     this.broadcastState();
     this.dealLoop();
@@ -160,6 +163,25 @@ class Room {
     }
   }
 
+  // 请求重新开局：两个真人都点了「重开」才洗牌；只点一边就提示等对方
+  onRestart(ws) {
+    const seat = ws.seat;
+    if (seat === undefined || !this.started) return;
+    this.restartWanted.add(seat);
+    const online = HUMAN_SEATS.filter(s => this.conns[s]);
+    const allAgreed = online.every(s => this.restartWanted.has(s));
+    if (!allAgreed) {
+      this.broadcastWait(this.game.pname(seat) + ' 想重新开局，等对方也点「重开」');
+      return;
+    }
+    this.restartWanted.clear();
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    this.bidSkipped.clear();
+    this.game.newGame();
+    this.broadcastState();
+    this.dealLoop();
+  }
+
   // ===== 推进（AI 泵 + 节奏） =====
   advance() {
     if (this.stopping) return;
@@ -205,6 +227,7 @@ class Room {
     if (this.stopping) return;
     this.game.nextRound();  // → startRound → phase='dealing'
     this.bidSkipped.clear();
+    this.restartWanted.clear();
     this.broadcastState();
     this.dealLoop();
   }

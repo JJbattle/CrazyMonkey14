@@ -132,9 +132,31 @@ function testRoomSeat() {
   ok('同名重连还原到 0 号', ws3.seat === 0);
 }
 
+// ===== 测试 4：重新开局需两人都同意 =====
+function testRestart() {
+  console.log('测试 4：重新开局需两人同意');
+  const room = new Room();
+  const m0 = [], m2 = [];
+  const ws0 = makeFakeWs(m0), ws2 = makeFakeWs(m2);
+  room.onMessage(ws0, { type: 'join', name: '妈妈' });
+  room.onMessage(ws2, { type: 'join', name: '阿姨' });
+
+  const s0 = m0.filter(m => m.type === 'state').length;
+  room.onMessage(ws0, { type: 'restart' });       // 妈妈一个人点
+  const s1 = m0.filter(m => m.type === 'state').length;
+  ok('一人点重开：不推新局', s1 === s0);
+  ok('一人点重开：提示对方等同意', m2.some(m => m.type === 'toast'));
+
+  room.onMessage(ws2, { type: 'restart' });       // 阿姨也点
+  const s2 = m0.filter(m => m.type === 'state').length;
+  ok('两人都点：推新局 state', s2 > s1);
+  room.stop();
+}
+
 testMultiHumanFullRound();
 testSnapshotPrivacy();
 testRoomSeat();
+testRestart();
 
 console.log('\n服务器测试：通过 ' + pass + ' / 失败 ' + fail);
 process.exitCode = fail ? 1 : 0;

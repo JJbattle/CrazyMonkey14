@@ -56,6 +56,21 @@ body {
   cursor: pointer;
 }
 #restart:active { background: rgba(255, 255, 255, 0.22); }
+/* 「退出」按钮跟「重开」并排，样式一致；只有联网时去掉 .hidden 显示 */
+#exit {
+  flex: none;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  cursor: pointer;
+}
+#exit:active { background: rgba(255, 255, 255, 0.22); }
+#exit.hidden { display: none; }
 
 /* 主体：上下两块 —— 上面是牌桌+战报，下面整条是手牌 */
 #body {
@@ -794,9 +809,11 @@ body {
   inset: 0;
   z-index: 100;
   display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  /* 内容比一屏长时能上下拖拽滚动；居中交给 .entry-box 的 margin:auto，
+     这样内容少时仍居中、内容多时能滚到顶（flex 居中会把上半截裁掉、滚不回去） */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 20px;
   background: radial-gradient(circle at 50% 30%, #2a7a47, #123a20);
 }
 #entry.on { display: flex; }
@@ -804,6 +821,7 @@ body {
 .entry-box {
   width: 100%;
   max-width: 360px;
+  margin: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;

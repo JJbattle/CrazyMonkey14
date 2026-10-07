@@ -1228,6 +1228,7 @@ function renderLog() {
 
 function showEntry() {
   mode = 'menu';
+  setExitVisible(false);
   const el = $('entry');
   if (el) el.classList.add('on');
   try {
@@ -1254,6 +1255,7 @@ function entryHint(t) {
 
 function startSolo() {
   mode = 'solo';
+  setExitVisible(false);
   hideEntry();
   // 恢复单机：一个真人坐 0 号，其余三家 AI（含墩布对家）
   game.humanSeats = new Set([0]);
@@ -1270,6 +1272,7 @@ function startNet(ip, name) {
   if (!ip) { entryHint('先填上电脑的 IP 地址'); return; }
   try { localStorage.setItem('net_ip', ip); localStorage.setItem('net_name', name); } catch (e) {}
   mode = 'net';
+  setExitVisible(true);
   hideEntry();
   entryHint('');
   selected.clear();
@@ -1383,14 +1386,24 @@ $('side-toggle').addEventListener('click', () => {
   applySideFold();
 });
 
-// 战报栏右上角的「重开」：打到不想玩了可以随时重来
+// 顶栏右上角的「重开」：单机＝重新洗牌开局；联网＝请求重新开局（两人都同意才开）
 $('restart').addEventListener('click', () => {
-  if (mode === 'net') { backToMenu(); return; }
+  if (mode === 'net') { Net.send({ type: 'restart' }); return; }
   selected.clear();
   clearTaunts();
   game.newGame();
   beginRound();
 });
+
+// 联网时的「退出」：退回主界面（断开连接）。单机不显示这个按钮。
+const exitBtn = $('exit');
+if (exitBtn) exitBtn.addEventListener('click', backToMenu);
+
+// 联网才显示「退出」按钮
+function setExitVisible(on) {
+  const b = $('exit');
+  if (b) b.classList.toggle('hidden', !on);
+}
 
 // 入口按钮：单机 / 联网（测试环境可能没有这些 DOM，判空再绑）
 const btnSolo = $('btn-solo');
