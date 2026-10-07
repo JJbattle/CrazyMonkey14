@@ -56,14 +56,24 @@ function gWith(trumpSuit, levelRank, hands, plays) {
   ok('单张K撞A → 1 威胁', g.unseenStrongerCombo([g.hands[1][0]], 'suit:1', 1) === 1);
 }
 
-// —— 4) 拖拉机：9-8 撞 A-K（同长）→ 1 个威胁 ——
+// —— 4) 拖拉机：9-8 撞 AAKK（A-K 拖拉机，同长）→ 1 个威胁 ——
 {
   const g = gWith(3, 2, [
-    [mk(1, 0, 14), mk(2, 0, 14), mk(3, 0, 13), mk(4, 0, 13)],  // 对手0：黑桃A-K 拖拉机
-    [mk(5, 0, 9), mk(6, 0, 9), mk(7, 0, 8), mk(8, 0, 8)],      // 我1：黑桃9-8 拖拉机
+    [mk(1, 0, 14), mk(2, 0, 14), mk(3, 0, 13), mk(4, 0, 13)],  // 对手0：黑桃 AA KK = A-K 拖拉机
+    [mk(5, 0, 9), mk(6, 0, 9), mk(7, 0, 8), mk(8, 0, 8)],      // 我1：黑桃 99 88 = 9-8 拖拉机
     [], [],
   ]);
-  ok('拖拉机9-8撞A-K → 1 威胁', g.unseenStrongerCombo(g.hands[1], 'suit:0', 1) === 1);
+  ok('拖拉机9-8撞AAKK → 1 威胁', g.unseenStrongerCombo(g.hands[1], 'suit:0', 1) === 1);
+}
+
+// —— 4b) 对手只有散牌 A+K（各一张，凑不成拖拉机）→ 0 威胁 ——
+{
+  const g = gWith(3, 2, [
+    [mk(1, 0, 14), mk(2, 0, 13)],                              // 对手0：散牌 A + K（各一张，不成对）
+    [mk(5, 0, 9), mk(6, 0, 9), mk(7, 0, 8), mk(8, 0, 8)],      // 我1：黑桃 99 88 拖拉机
+    [], [],
+  ]);
+  ok('散牌A+K凑不成拖拉机 → 0 威胁', g.unseenStrongerCombo(g.hands[1], 'suit:0', 1) === 0);
 }
 
 // ===== P0-2 顶牌取消 A 限制 =====
