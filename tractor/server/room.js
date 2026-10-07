@@ -49,10 +49,12 @@ class Room {
   onJoin(ws, name) {
     const seat = this.assignSeat(name);
     if (seat < 0) {
+      console.log('[加入] name="' + name + '" 房间已满，拒绝');
       this.send(ws, { type: 'error', msg: '房间已满（已有一桌在玩）' });
       setTimeout(() => { try { ws.close(); } catch (e) {} }, 100);
       return;
     }
+    console.log('[加入] name="' + name + '" → seat ' + seat + (this.conns[seat] ? '（顶替旧连接）' : ''));
     this.seatByName[name] = seat;
     this.game.humanNames[seat] = name;
     this.game.assignNames();
@@ -186,7 +188,12 @@ class Room {
   afterPlay() {
     const g = this.game;
     if (g.phase === 'playing' && g.currentTrick.length === 0 && g.lastTrick) {
-      this.timer = setTimeout(() => this.advance(), TRICK_SHOW);  // 一圈打完，展示 2s
+      // 一圈打完：AI 赢 → 展示 2s 自动进下一圈；真人赢 → 一直展示到真人再出牌
+      // （真人赢时不动 timer，等他出下一圈第一张，onPlay 会重新推进）
+      if (!g.isHuman(g.lastTrick.winner)) {
+        this.timer = setTimeout(() => this.advance(), TRICK_SHOW);
+      }
+      return;
     } else if (g.phase === 'roundEnd') {
       this.timer = setTimeout(() => this.nextRound(), ROUND_SHOW);  // 结算展示 9s
     } else {

@@ -1033,6 +1033,7 @@ function textOf(el) {
 
   // applyHandHeight：摆一手 25 张牌，模拟矮屏（body 高 300，横屏小手机那种）。
   // 40% 只有 120px，摆不下两行整张牌；手牌区必须被撑得比 40% 还高。
+  compactMode = true;   // 这段测的是「压缩牌桌」模式下的撑高逻辑
   const g = game;
   const saved = { seat: g.humanSeat, hand: g.hands[0], trump: g.trumpSuit, level: g.levelRank };
   g.humanSeat = 0;
@@ -1070,6 +1071,7 @@ function textOf(el) {
 
   g.humanSeat = saved.seat; g.hands[0] = saved.hand;
   g.trumpSuit = saved.trump; g.levelRank = saved.level;
+  compactMode = false;
   els['body'].clientHeight = undefined;
   els['hand'].clientWidth = undefined;
   els['hand-bar'].offsetHeight = undefined;

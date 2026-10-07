@@ -15,13 +15,15 @@ const wss = new WebSocketServer({ server });
 const room = new Room();
 
 wss.on('connection', (ws) => {
+  const remote = (ws._socket && ws._socket.remoteAddress) || '?';
+  console.log('[连接] 来自 ' + remote);
   ws.on('message', (data) => {
     let msg;
     try { msg = JSON.parse(data.toString()); } catch (e) { return; }
     if (!msg || typeof msg.type !== 'string') return;
     room.onMessage(ws, msg);
   });
-  ws.on('close', () => room.onLeave(ws));
+  ws.on('close', () => { console.log('[断开] name=' + (ws.name || '?') + ' seat=' + ws.seat); room.onLeave(ws); });
   ws.on('error', () => {});
 });
 

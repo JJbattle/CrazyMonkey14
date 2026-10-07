@@ -26,6 +26,8 @@ let mode = 'menu';       // 'menu'（选模式）| 'solo'（单机）| 'net'（�
 let bidOptions = [];     // 服务器下发的「现在能亮的叫牌」（联网才用）
 let yourTurn = false;    // 服务器下发的「轮到我行动了没」（联网才用）
 let netSeat = 0;         // 联网时我的座位号
+let compactMode = false; // 视觉模式：false=正常（手牌区固定 40%），true=压缩牌桌
+let showingLast = false; // 联网下一圈打完，正在展示上一圈的牌
 
 const $ = id => document.getElementById(id);
 
@@ -61,6 +63,15 @@ function render() {
   renderBanner();
   renderLog();
   renderMode();
+  applyTurnHint();
+}
+
+// 轮到我了：整屏边缘一圈金色呼吸框（联网下轮到真人行动时亮起）
+function applyTurnHint() {
+  const app = $('app');
+  if (app && app.classList) {
+    app.classList.toggle('turn-hint', mode === 'net' && yourTurn && game.phase !== 'roundEnd');
+  }
 }
 
 // 联网/单机的界面开关：联网时顶栏「重开」变成「退出」，必打不可改
@@ -96,9 +107,13 @@ function applySideFold() {
 // 必须在 renderHand 之前跑——renderHand 要先量了地方才知道牌该摆多大。
 function applyHandHeight() {
   const seatBottom = $('seat-bottom');
+  if (!seatBottom || !seatBottom.style) return;
+  // 正常模式：手牌区保持 CSS 固定的 40%，不做「按手牌数撑高、压牌桌」——
+  // 那是「压缩牌桌」模式（给旧手机 / 系统字放大的屏幕用）才做的事。
+  if (!compactMode) { seatBottom.style.minHeight = ''; return; }
   const hand = $('hand');
   const body = $('body');
-  if (!seatBottom || !seatBottom.style || !hand || !body) return;
+  if (!hand || !body) return;
   const cards = game.hands[game.humanSeat];
   if (!cards || !cards.length) { seatBottom.style.minHeight = ''; return; }
 
@@ -570,7 +585,7 @@ function onCardClick(c) {
 function renderTrick() {
   const box = $('trick');
   box.innerHTML = '';
-  const showLast = !!(viewLast && game.lastTrick);
+  const showLast = !!((viewLast || showingLast) && game.lastTrick);
   const plays = showLast ? game.lastTrick.plays : game.currentTrick;
   if (plays && plays.length) {
     // 显示上一圈就用引擎记下的赢家；显示当前圈就现算谁最大
@@ -1220,6 +1235,9 @@ function showEntry() {
     const nm = localStorage.getItem('net_name');
     if (ip && $('net-ip')) $('net-ip').value = ip;
     if (nm && $('net-name')) $('net-name').value = nm;
+    compactMode = (localStorage.getItem('compact_mode') === '1');
+    const ck = $('compact-check');
+    if (ck) ck.checked = compactMode;
   } catch (e) {}
   if ($('net-name') && !$('net-name').value) $('net-name').value = '你';
 }
@@ -1282,38 +1300,73 @@ function backToMenu() {
   showEntry();
 }
 
+// 把服务器下发的「绝对座位」快照旋转成「我自己永远坐 0 号（屏幕下方）」的视角。
+// 两个真人固定坐 0 号和 2 号（都是队 0），旋转量是偶数，所以 teamOf 的队关系
+// 天然不变——只需旋转座位号和按座位索引的数组，队/等级/得分/牌内容都照原样。
+function rotateSnapshot(snap, mySeat) {
+  const rel = abs => (abs == null ? null : (abs - mySeat + 4) % 4);
+  const s = { ...snap };
+  s.you = { ...snap.you, seat: 0 };
+  s.names = [0, 1, 2, 3].map(i => snap.names[(i + mySeat) % 4]);
+  s.handCounts = [0, 1, 2, 3].map(i => snap.handCounts[(i + mySeat) % 4]);
+  s.dealerSeat = rel(snap.dealerSeat);
+  s.firstBidSeat = rel(snap.firstBidSeat);
+  s.leadSeat = rel(snap.leadSeat);
+  if (snap.bid) s.bid = { ...snap.bid, seat: rel(snap.bid.seat) };
+  // 可选叫牌都是「我」能亮的，seat 一律是我的绝对座位 → 转成相对 0，
+  // 否则 bidIsOwn（判「加保还是反主」）拿它和旋转后的 game.bid.seat 对不上。
+  if (snap.bidOptions) s.bidOptions = snap.bidOptions.map(b => ({ ...b, seat: 0 }));
+  s.currentTrick = snap.currentTrick.map(p => ({ seat: rel(p.seat), cards: p.cards }));
+  if (snap.lastTrick) s.lastTrick = {
+    plays: snap.lastTrick.plays.map(p => ({ seat: rel(p.seat), cards: p.cards })),
+    winner: rel(snap.lastTrick.winner),
+    points: snap.lastTrick.points,
+  };
+  if (snap.result) s.result = { ...snap.result, dealerSeat: rel(snap.result.dealerSeat) };
+  if (snap.taunts) {
+    s.taunts = {};
+    for (const k in snap.taunts) s.taunts[rel(+k)] = snap.taunts[k];
+  }
+  return s;
+}
+
 // 把服务器下发的状态快照写进本地 game 视图模型，然后整屏重画。
 // 本地 game 在联网下不跑任何规则，只当数据容器 + 给 render* 系列读。
 function applySnapshot(snap) {
   const mySeat = snap.you.seat;
   netSeat = mySeat;
-  game.humanSeats = new Set([mySeat]);
-  game.humanNames = { [mySeat]: snap.you.name };
-  game.names = snap.names;
-  game.phase = snap.phase;
-  game.levelRank = snap.levelRank;
-  game.levels = snap.levels;
-  game.trumpSuit = snap.trumpSuit;
-  game.dealerSeat = snap.dealerSeat;
-  game.dealerTeam = snap.dealerTeam;
-  game.bidDecidesDealer = snap.bidDecidesDealer;
-  game.firstBidSeat = snap.firstBidSeat;
-  game.mustPlayHurdles = snap.mustPlayHurdles;
-  game.bid = snap.bid;
-  game.leadSeat = snap.leadSeat;
-  // 手牌：只摆自己的，其他三家只留张数（renderSeats 只读 .length）
-  game.hands = snap.handCounts.map(n => new Array(n));
-  game.hands[mySeat] = snap.hand;
-  game.currentTrick = snap.currentTrick;
-  game.lastTrick = snap.lastTrick;
-  game.roundPoints = snap.roundPoints;
-  game.result = snap.result;
-  game.cycleDone = snap.cycleDone;
-  game.taunts = snap.taunts;
-  game.lastThrowFail = snap.lastThrowFail;
-  game.log = snap.logTail || [];
-  bidOptions = snap.bidOptions || [];
-  yourTurn = !!snap.yourTurn;
+  const s = rotateSnapshot(snap, mySeat);
+  // 一圈打完（当前圈空、有上一圈）：自动把上一圈的牌摆出来展示，
+  // 等下一圈第一张牌落地再切回当前圈（见 renderTrick）。
+  showingLast = !!(s.phase === 'playing' && s.currentTrick.length === 0 && s.lastTrick);
+
+  game.humanSeats = new Set([0]);
+  game.humanNames = { 0: s.you.name };
+  game.names = s.names;
+  game.phase = s.phase;
+  game.levelRank = s.levelRank;
+  game.levels = s.levels;
+  game.trumpSuit = s.trumpSuit;
+  game.dealerSeat = s.dealerSeat;
+  game.dealerTeam = s.dealerTeam;
+  game.bidDecidesDealer = s.bidDecidesDealer;
+  game.firstBidSeat = s.firstBidSeat;
+  game.mustPlayHurdles = s.mustPlayHurdles;
+  game.bid = s.bid;
+  game.leadSeat = s.leadSeat;
+  // 手牌：只摆自己的（相对 0 号），其他三家只留张数（renderSeats 只读 .length）
+  game.hands = s.handCounts.map(n => new Array(n));
+  game.hands[0] = s.hand;
+  game.currentTrick = s.currentTrick;
+  game.lastTrick = s.lastTrick;
+  game.roundPoints = s.roundPoints;
+  game.result = s.result;
+  game.cycleDone = s.cycleDone;
+  game.taunts = s.taunts;
+  game.lastThrowFail = s.lastThrowFail;
+  game.log = s.logTail || [];
+  bidOptions = s.bidOptions || [];
+  yourTurn = !!s.yourTurn;
   render();
 }
 
@@ -1344,6 +1397,11 @@ const btnSolo = $('btn-solo');
 if (btnSolo) btnSolo.addEventListener('click', startSolo);
 const btnNet = $('btn-net');
 if (btnNet) btnNet.addEventListener('click', () => startNet($('net-ip').value, $('net-name').value));
+const ckCompact = $('compact-check');
+if (ckCompact) ckCompact.addEventListener('change', () => {
+  compactMode = ckCompact.checked;
+  try { localStorage.setItem('compact_mode', compactMode ? '1' : '0'); } catch (e) {}
+});
 
 // 启动：先到菜单选单机/联网
 showEntry();
