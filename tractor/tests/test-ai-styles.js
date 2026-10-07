@@ -16,6 +16,7 @@ function gameWithName(name) {
   g.dealerSeat = 0; g.dealerTeam = 0; // seat 1 非庄家
   g.hands = [[], [], [], []];
   g.hands[1] = [mk(1, 1, 13), mk(2, 1, 13), mk(3, 0, 4)];
+  g.hands[0] = [mk(4, 1, 14), mk(5, 1, 14)];   // 对手手里红桃对 A（「外面对 A 还没出」）
   g.playedCards = [];
   g.currentTrick = [];
   g.names = ['', '', '', ''];

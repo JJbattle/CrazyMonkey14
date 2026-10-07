@@ -425,8 +425,25 @@ class Game {
       s += (14 - len) * 10;
       return s;
     };
-    hand.sort((a, b) => cut(b) - cut(a));
-    return hand.slice(0, 8);
+
+    // 第一轮：短门（副牌 ≤2 张）里的分牌优先扣。短门本来就打不出对子/拖拉机，
+    // 留着分牌之后会被对手一吊这门就裸送分，先清掉。（孤张大牌这里不单独扣：
+    // 孤 K 本就是分牌已被覆盖，孤 A 是顶牌留着抢分有用，孤 Q/J 收益小。）
+    const out = [];
+    const byCat = {};
+    for (const c of hand) { const k = catOf(c, ts, lr); (byCat[k] = byCat[k] || []).push(c); }
+    for (const k in byCat) {
+      if (k === 'trump' || byCat[k].length > 2) continue;
+      for (const c of byCat[k]) {
+        if (out.length >= 8) break;
+        if (pointValue(c) > 0) out.push(c);
+      }
+    }
+    // 第二轮：剩余名额照原 cut 贪心补齐到 8 张
+    const used = new Set(out.map(c => c.uid));
+    const rest = hand.filter(c => !used.has(c.uid)).sort((a, b) => cut(b) - cut(a));
+    for (const c of rest) { if (out.length >= 8) break; out.push(c); }
+    return out.slice(0, 8);
   }
 
   doDiscard(seat, cards) {
@@ -475,19 +492,22 @@ class Game {
 
   // 对本座位而言，cat 门里还有多少张「没见过且比我这张强」的牌（两副各 2 张）
   unseenStronger(card, cat, seat) {
-    const known = {};
-    const mark = c => { const k = c.suit + '-' + c.rank; known[k] = (known[k] || 0) + 1; };
-    for (const c of this.hands[seat]) mark(c);
-    for (const c of this.playedCards) mark(c);
-    // AI 是完美信息：其他三家的手牌也当「已见」。以前这里只统计自己的牌+已出牌，
-    // 把对手手里的强牌也算成「没见」，导致 AI 判断「稳大」时过度保守——明明
-    // 外面已经没更大的牌了，还不敢出大对子/大单张抢分，白白把牌权让出去。
-    for (const s of [0, 1, 2, 3]) if (s !== seat && this.hands[s]) for (const c of this.hands[s]) mark(c);
+    // 「这一圈还没出牌的对手」手里，能压过 card 的同门牌张数（完美信息，精确）。
+    // 队友不算：队友跟我是同一队，不会压我的牌（喂对家/让对家接手走 leadForPartner，
+    // 那是另一套配合逻辑，不在这里）；已出过这一圈的人、扣定的底牌这圈都不再出，也不算。
+    // 以前用 2-known 反推「没见过的更大牌」，把三家手牌都 mark 进 known 后反推只剩底牌，
+    // 底牌永远不出，等于把「稳大」判断全算反了：领出以为稳大就甩 A 被压、跟牌以为稳赢
+    // 就出中牌被反压，牌白送，所以 AI 弱。
     const ts = this.trumpSuit, lr = this.levelRank;
+    const played = new Set((this.currentTrick || []).map(p => p.seat));
+    const myTeam = this.teamOf(seat);
     let n = 0;
-    for (const c of UNIQUE_DECK) {
-      if (catOf(c, ts, lr) !== cat) continue;
-      if (power(c, ts, lr) > power(card, ts, lr)) n += 2 - (known[c.suit + '-' + c.rank] || 0);
+    for (const s of [0, 1, 2, 3]) {
+      if (s === seat || played.has(s)) continue;
+      if (this.teamOf(s) === myTeam) continue;  // 队友手里的更大牌不是威胁
+      for (const c of (this.hands[s] || [])) {
+        if (catOf(c, ts, lr) === cat && power(c, ts, lr) > power(card, ts, lr)) n++;
+      }
     }
     return n;
   }
@@ -630,6 +650,28 @@ class Game {
     return best ? best.combo : null;
   }
 
+  // 跟牌喂队友：对手当前赢着、我抢不稳时，还没出的队友手里若有该门「对手压不住」
+  // 的顶牌，就出小分（顺手处理分牌）或小破牌，让队友用顶牌接手。
+  feedPartnerLead(seat, hand, lead, leadCat, catCards) {
+    const ts = this.trumpSuit, lr = this.levelRank;
+    if (lead.type !== 'single') return null;  // 对子/拖拉机喂队友要拆结构，先不做
+    const partner = (seat + 2) % 4;
+    const ph = this.hands[partner];
+    if (!ph || !ph.length) return null;
+    if ((this.currentTrick || []).some(p => p.seat === partner)) return null;  // 队友已出过 → partnerWinning 已管
+    const opps = [0, 1, 2, 3].filter(s =>
+      s !== seat && s !== partner && !(this.currentTrick || []).some(p => p.seat === s));
+    const theirTop = ph.filter(c => catOf(c, ts, lr) === leadCat)
+                       .sort((a, b) => power(b, ts, lr) - power(a, ts, lr))[0];
+    if (!theirTop) return null;
+    const canBeat = opps.some(s => (this.hands[s] || []).some(c =>
+      catOf(c, ts, lr) === leadCat && power(c, ts, lr) > power(theirTop, ts, lr)));
+    if (canBeat) return null;  // 还有对手压得住队友的顶牌，喂了白喂
+    const pt = catCards.filter(c => pointValue(c) > 0).sort((a, b) => power(a, ts, lr) - power(b, ts, lr));
+    if (pt.length) return [pt[0]];
+    return [this.lowestCard(catCards, ts, lr)];
+  }
+
   // ---------- 甩牌 ----------
   // 判定用的「同门牌池」：其他三家的手牌 + 自己手里这一门**还没出**的牌。
   // （玩家原话：某门出的所有牌，只要不被其他人或者自己手里同门的牌压制，就能一把全出）
@@ -755,14 +797,16 @@ class Game {
       const wins = this.winningFollows(seat, catCards, lead);
       if (wins.length) {
         if (lastToPlay) return this.mostPoints(wins);
-        // 不是最后一家：先权衡后面（尤其第四名）还有没有更大的牌再决定抢不抢。
-        // 只剩一家没出时，「更大的牌」至多一张没见才值得搏；两家没出就只认绝对稳赢。
-        // 否则垫掉，别把中牌白白扔进会被后面压住的圈（第三名出牌要权衡第四名）。
-        const behind = 4 - this.currentTrick.length - 1;
-        const tol = behind <= 1 ? 1 : 0;
-        const safe = wins.filter(w => this.unseenStronger(w[0], leadCat, seat) <= tol);
+        // 不是最后一家：新 unseenStronger 精确数「后面还没出的对手手里的更大牌」。
+        // 只有 0（绝对稳）才抢；有 1 张更大的都会被压，不赌，垫掉。
+        // （第三名尤其要权衡第四名手里更大的牌，别把中牌扔进会被压的圈。）
+        const safe = wins.filter(w => this.unseenStronger(w[0], leadCat, seat) === 0);
         if (safe.length) return safe[0];
       }
+      // 抢不稳：看还没出的队友手里有没有该门「对手压不住」的顶牌，
+      // 有就出小分/小破牌喂队友（最大牌在队友手里，我别硬抢，顺手垫掉塞分）。
+      const feed = this.feedPartnerLead(seat, hand, lead, leadCat, catCards);
+      if (feed) return feed;
       return this.losingFollow(hand, catCards, lead, need, leadCat);
     }
 
@@ -814,10 +858,25 @@ class Game {
     if (wantRuff) {
       const trumps = hand.filter(c => isTrump(c, ts, lr));
       const wins = this.winningFollows(seat, trumps, lead);
-      if (wins.length) return ctx.lastToPlay ? this.mostPoints(wins) : wins[0];
+      if (wins.length) {
+        if (ctx.lastToPlay) return this.mostPoints(wins);
+        return this.pickRuff(hand, wins, lead);
+      }
     }
     // 垫牌：lowJunkFill 内部已优先非主、非分，主牌只会作为最后手段
     return this.lowJunkFill(rest, need);
+  }
+
+  // 将吃时挑牌：优先用「分牌」将吃（把 5/10/K 这种烫手分牌顺手打出去，
+  // 免得憋在手里被吊出来送分），但不拆对/拖拉机（这牌型手里有两张就留完整结构）。
+  pickRuff(hand, wins, lead) {
+    if (lead.type !== 'single') return wins[0];  // 对子/拖拉机将吃结构固定，别乱拆
+    const singlePt = wins.filter(w => {
+      const c = w[0];
+      if (pointValue(c) === 0) return false;
+      return hand.filter(x => isSame(x, c)).length < 2;  // 不成对（也就不拆拖拉机）才拆
+    });
+    return singlePt.length ? singlePt[0] : wins[0];
   }
 
   // ---------- AI 领出 ----------
@@ -879,8 +938,20 @@ class Game {
     const feed = this.leadForPartner(seat, hand);
     if (feed) return feed;
 
-    // 兜底：从短门里出最低的非分副牌单张，造空门，以后好将吃
+    // 兜底：优先甩掉短门里的分牌（烫手，先处理免得之后被吊出来送分），
+    // 没有短门分牌，才从短门出最低的非分副牌单张，造空门，以后好将吃。
     const nonTrump = hand.filter(c => !isTrump(c, ts, lr));
+    const byCat = {};
+    for (const c of nonTrump) { const k = catOf(c, ts, lr); (byCat[k] = byCat[k] || []).push(c); }
+    let shortPoint = null;
+    for (const k in byCat) {
+      if (byCat[k].length > 2) continue;
+      const pt = byCat[k].filter(c => pointValue(c) > 0)
+                           .sort((a, b) => power(a, ts, lr) - power(b, ts, lr));
+      if (pt.length && (!shortPoint || power(pt[0], ts, lr) < power(shortPoint, ts, lr))) shortPoint = pt[0];
+    }
+    if (shortPoint) return [shortPoint];
+
     const pool = nonTrump.length ? nonTrump : hand;
     const junk = pool.filter(c => pointValue(c) === 0);
     const cand = junk.length ? junk : pool;
@@ -972,8 +1043,9 @@ class Game {
     return null;
   }
 
-  // 领出副牌顶牌单张（A，或该门更大的牌都已出完时的最大单张）。
-  // 只挑「外面没有更大的牌了」的门，绝不出会被同门压住的单张送分。
+  // 领出副牌顶牌单张 A（同门最大、绝对稳大）抢分。
+  // 只认 rank 14（A）：更小的单张即便「外面暂时没有更大的」也只是小牌，
+  // 领出去抢不到分、还把牌权白送；只有 A 才值得主动领出，逼出该门的 K/10 分牌。
   leadTopSingle(seat, hand) {
     const ts = this.trumpSuit, lr = this.levelRank;
     const suits = [0, 1, 2, 3].filter(s => ts == null || ts < 0 || s !== ts);
@@ -981,7 +1053,7 @@ class Game {
     for (const s of suits) {
       const cs = hand.filter(c => c.suit === s && !isTrump(c, ts, lr));
       if (!cs.length) continue;
-      const top = cs.filter(c => this.unseenStronger(c, 'suit:' + s, seat) === 0)
+      const top = cs.filter(c => c.rank === 14 && this.unseenStronger(c, 'suit:' + s, seat) === 0)
                     .sort((a, b) => power(b, ts, lr) - power(a, ts, lr))[0];
       if (top && (!best || power(top, ts, lr) > power(best, ts, lr))) best = top;
     }
