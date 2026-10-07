@@ -28,11 +28,21 @@ class Room {
 
   isFull() { return !!(this.conns[0] && this.conns[2]); }
 
-  // 分配座位：先 0 后 2；同名视为重连，还原原座位；满了返回 -1
+  // 某个座位上的连接现在还活着吗（readyState 1 = OPEN）
+  isAlive(seat) {
+    const ws = this.conns[seat];
+    return !!(ws && ws.readyState === 1);
+  }
+
+  // 分配座位：先 0 后 2；满了返回 -1。
+  // 同名还原座位：只在「旧连接已经断开/失效」时才还原（真·断线重连）。
+  // 两个不同的人撞名（比如都叫「你」）时，旧连接还活着，就不能顶替，
+  // 而要给新人分配另一个空座——否则俩手机会在同一个座位互相顶。
   assignSeat(name) {
-    if (name && this.seatByName[name] !== undefined) return this.seatByName[name];
-    if (!this.conns[0]) return 0;
-    if (!this.conns[2]) return 2;
+    const prev = (name && this.seatByName[name] !== undefined) ? this.seatByName[name] : -1;
+    if (prev >= 0 && !this.isAlive(prev)) return prev;
+    if (!this.isAlive(0)) return 0;
+    if (!this.isAlive(2)) return 2;
     return -1;
   }
 

@@ -125,11 +125,28 @@ function testRoomSeat() {
   room.onMessage(ws2, { type: 'join', name: '路人' });
   ok('第三个连接收到房间已满', m2.some(m => m.type === 'error'));
 
-  // 同名重连还原座位
+  // 同名重连还原座位（旧连接已断开后）
   const m3 = [];
   const ws3 = makeFakeWs(m3);
+  ws0.close();   // 模拟妈妈掉线，旧连接断开
   room.onMessage(ws3, { type: 'join', name: '妈妈' });
   ok('同名重连还原到 0 号', ws3.seat === 0);
+}
+
+// ===== 测试 3b：两个不同的人撞名（都叫「你」），不互相顶 =====
+function testSameNameNoClash() {
+  console.log('测试 3b：两个真人撞名不互顶');
+  const room = new Room();
+  const m0 = [], m2 = [];
+  const ws0 = makeFakeWs(m0), ws2 = makeFakeWs(m2);
+  room.onMessage(ws0, { type: 'join', name: '你' });
+  ok('先连的坐 0 号', ws0.seat === 0);
+  // 第二个手机也叫「你」，但第一个连接还活着 → 不顶替，坐 2 号
+  room.onMessage(ws2, { type: 'join', name: '你' });
+  ok('撞名且旧连接活着：第二个坐 2 号不顶替', ws0.seat === 0 && ws2.seat === 2);
+  ok('0 号连接没被顶掉', room.conns[0] === ws0);
+  ok('2 号连接正常', room.conns[2] === ws2);
+  room.stop();
 }
 
 // ===== 测试 4：重新开局需两人都同意 =====
@@ -156,6 +173,7 @@ function testRestart() {
 testMultiHumanFullRound();
 testSnapshotPrivacy();
 testRoomSeat();
+testSameNameNoClash();
 testRestart();
 
 console.log('\n服务器测试：通过 ' + pass + ' / 失败 ' + fail);
