@@ -21,6 +21,12 @@ let flourishTimer = null;
 // 但玩家的牌变好了（单张 → 两张能加保、凑齐双王能反无主）就再停一次。
 let bidSigShown = null;
 
+// ---------- 联网模式 ----------
+let mode = 'menu';       // 'menu'（选模式）| 'solo'（单机）| 'net'（联网）
+let bidOptions = [];     // 服务器下发的「现在能亮的叫牌」（联网才用）
+let yourTurn = false;    // 服务器下发的「轮到我行动了没」（联网才用）
+let netSeat = 0;         // 联网时我的座位号
+
 const $ = id => document.getElementById(id);
 
 // 头像配置：以后你给谁配了图就填进来（键 = 名字，值 = 图片路径）。
@@ -54,6 +60,15 @@ function render() {
   renderTaunts();
   renderBanner();
   renderLog();
+  renderMode();
+}
+
+// 联网/单机的界面开关：联网时顶栏「重开」变成「退出」，必打不可改
+function renderMode() {
+  const rb = $('restart');
+  if (rb) rb.textContent = (mode === 'net') ? '退出' : '重开';
+  const h = $('hurdle-info');
+  if (h) h.title = (mode === 'net') ? '联网时由电脑统一判定，这里不能改' : '随时可切，下一轮结算生效';
 }
 
 // 扣底阶段把上方牌桌压低，给手牌腾地方（33 张牌得摆得开才选得动）
@@ -521,6 +536,16 @@ function renderHand() {
 }
 
 function onCardClick(c) {
+  if (mode === 'net') {
+    // 联网：只有轮到自己、阶段对时才能选牌，绝不本地推进（推进全在服务器）
+    if (game.phase !== 'discard' && game.phase !== 'playing') return;
+    if (!yourTurn) return;
+    const h = game.hands[game.humanSeat];
+    if (!h.some(x => x.uid === c.uid)) return;
+    if (selected.has(c.uid)) selected.delete(c.uid); else selected.add(c.uid);
+    render();
+    return;
+  }
   // 一圈打完、停在那儿等点「下一轮」时，点手牌就当按了「下一轮」：
   // 老人出牌出顺了手，不会去够那个小按钮，直接点下一张要出的牌接着打。
   if (waitingNext) {
@@ -787,6 +812,12 @@ function renderActions() {
   const box = $('actions');
   box.innerHTML = '';
 
+  // 联网：按钮走服务器节奏，不显示本地「速度/继续发牌/提示/重开」
+  if (mode === 'net') {
+    renderNetActions(box);
+    return;
+  }
+
   // 一圈打完了：把这一圈摆着不动，等他看清楚了再点「下一轮」
   if (waitingNext) {
     const lt = game.lastTrick;
@@ -846,6 +877,46 @@ function renderActions() {
   }
 }
 
+// 联网模式的动作栏：只在「轮到自己」时给按钮，其余都是等待提示。
+// 服务器算好 yourTurn / bidOptions，本地只负责摆出来。
+function renderNetActions(box) {
+  if (game.phase === 'dealing') {
+    // 亮主窗口：能亮就摆按钮，不能亮就纯等待（服务器会暂停发牌 1.5s 给机会）
+    box.appendChild(makeSuitButtons());
+    if (!bidOptions.length) box.appendChild(netWait('发牌中…'));
+  } else if (game.phase === 'discard' && yourTurn) {
+    box.appendChild(mkBtn('扣底(8张)', selected.size === 8 ? doDiscard : null, selected.size === 8 ? '' : '请选 8 张'));
+    box.appendChild(mkBtn('自动扣底', () => { selected.clear(); const d = game.aiDiscard(game.humanSeat); for (const c of d) selected.add(c.uid); render(); }));
+  } else if (game.phase === 'playing' && yourTurn) {
+    const cards = selectedCards();
+    const lead = game.currentTrick.length
+      ? classifyLead(game.currentTrick[0].cards, game.trumpSuit, game.levelRank)
+      : null;
+    const v = cards.length ? validatePlay(game.hands[game.humanSeat], cards, lead, game.trumpSuit, game.levelRank) : { ok: false, reason: '请选牌' };
+    const hint = v.ok ? '' : v.reason;
+    box.appendChild(mkBtn('出牌', v.ok ? doPlay : null, hint));
+    if (hint) {
+      const h = document.createElement('div');
+      h.className = 'play-hint' + (v.ok ? '' : ' bad');
+      h.textContent = hint;
+      box.appendChild(h);
+    }
+    box.appendChild(mkBtn('重选', () => { selected.clear(); render(); }));
+    if (game.lastTrick) box.appendChild(mkBtn(viewLast ? '看当前' : '看上轮', () => { viewLast = !viewLast; render(); }));
+  } else if (game.phase === 'roundEnd') {
+    box.appendChild(netWait('本局结束，稍后自动开下一局…'));
+  } else {
+    box.appendChild(netWait('等待…'));
+  }
+}
+
+function netWait(text) {
+  const d = document.createElement('div');
+  d.className = 'wait';
+  if (text) d.textContent = text;
+  return d;
+}
+
 function mkBtn(text, fn, hint) {
   const b = document.createElement('button');
   b.textContent = text;
@@ -879,6 +950,7 @@ function selectedCards() {
 }
 
 function doBid(bid) {
+  if (mode === 'net') { Net.send({ type: 'placeBid', bid }); return; }
   game.placeBid(game.humanSeat, bid);
   if (game.phase === 'dealing' && !dealTimer) resumeDealing();
   render();
@@ -888,12 +960,19 @@ function doDiscard() {
   const cards = selectedCards();
   if (cards.length !== 8) return;
   selected.clear();
+  if (mode === 'net') { Net.send({ type: 'doDiscard', cards }); return; }
   game.doDiscard(game.humanSeat, cards);
   afterHuman();
 }
 
 function doPlay() {
   const cards = selectedCards();
+  if (mode === 'net') {
+    Net.send({ type: 'playCards', cards });
+    selected.clear();
+    viewLast = false;
+    return;
+  }
   const before = game.lastThrowFail;
   if (!game.playCards(game.humanSeat, cards)) {
     // 出的牌本身就不合法（最常撞上的就是「本门有对子没舍得下」）。
@@ -917,6 +996,7 @@ function doPlay() {
 }
 
 function afterHuman() {
+  if (mode === 'net') return;
   render();
   if (aiTimer) clearTimeout(aiTimer);
   aiTimer = setTimeout(scheduleAi, trickJustEnded() ? 0 : HUMAN_GAP);
@@ -949,6 +1029,7 @@ function nextTrick() {
 
 // 逐步推进 AI（每手之间都停一下，便于观看）
 function scheduleAi() {
+  if (mode === 'net') { render(); return; }
   if (aiTimer) clearTimeout(aiTimer);
   if (waitingNext) { render(); return; }   // 等玩家点「下一轮」，谁来都不走
   if (trickJustEnded()) { holdTrick(); return; }
@@ -965,6 +1046,7 @@ function scheduleAi() {
 // ---------- 发牌 ----------
 // AI 的牌瞬间发完；只在「轮到自己拿牌」或「有人叫了主」时停一拍
 function dealStep() {
+  if (mode === 'net') return;
   let last = null;
   for (let guard = 0; guard < 400; guard++) {
     if (game.phase !== 'dealing') break;
@@ -991,6 +1073,7 @@ function dealStep() {
 // 玩家现在能做出的、而且压得过桌上主牌的叫牌（强的排在前面）。
 // 亮牌阶段就把这几个摆成按钮：能亮几门摆几个，不用玩家自己去点牌。
 function playableBids() {
+  if (mode === 'net') return bidOptions;
   return game.allBids(game.humanSeat).filter(b => game.bidBeats(game.bid, b));
 }
 
@@ -1095,6 +1178,7 @@ function onDealFinished() {
 }
 
 function beginRound() {
+  if (mode === 'net') return;
   viewLast = false;
   shownTrick = null;
   waitingNext = false;
@@ -1125,8 +1209,117 @@ function renderLog() {
   box.scrollTop = box.scrollHeight;
 }
 
+// ================= 模式入口（单机 / 联网） =================
+
+function showEntry() {
+  mode = 'menu';
+  const el = $('entry');
+  if (el) el.classList.add('on');
+  try {
+    const ip = localStorage.getItem('net_ip');
+    const nm = localStorage.getItem('net_name');
+    if (ip && $('net-ip')) $('net-ip').value = ip;
+    if (nm && $('net-name')) $('net-name').value = nm;
+  } catch (e) {}
+  if ($('net-name') && !$('net-name').value) $('net-name').value = '你';
+}
+
+function hideEntry() {
+  const el = $('entry');
+  if (el) el.classList.remove('on');
+}
+
+function entryHint(t) {
+  const el = $('entry-hint');
+  if (el) el.textContent = t || '';
+}
+
+function startSolo() {
+  mode = 'solo';
+  hideEntry();
+  // 恢复单机：一个真人坐 0 号，其余三家 AI（含墩布对家）
+  game.humanSeats = new Set([0]);
+  game.humanNames = {};
+  game.assignNames();
+  game.newGame();
+  beginRound();
+}
+
+function startNet(ip, name) {
+  ip = (ip || '').trim();
+  name = (name || '').trim();
+  if (!name) name = '你';
+  if (!ip) { entryHint('先填上电脑的 IP 地址'); return; }
+  try { localStorage.setItem('net_ip', ip); localStorage.setItem('net_name', name); } catch (e) {}
+  mode = 'net';
+  hideEntry();
+  entryHint('');
+  selected.clear();
+  showBanner('正在连接 ' + ip + ' …', 4000, false);
+  Net.connect(ip, name, {
+    onOpen() {},
+    onMessage(msg) {
+      switch (msg.type) {
+        case 'welcome': netSeat = msg.seat; break;
+        case 'state': applySnapshot(msg); break;
+        case 'error': showBanner(msg.msg || '操作被拒', 3000, true); break;
+        case 'toast': showBanner(msg.text, 4000, false); break;
+        case 'players': break;   // 等人状态由快照里的等待提示体现
+      }
+    },
+    onDisconnect() {
+      showBanner('连不上电脑，正在重连…', 4000, true);
+    },
+  });
+}
+
+function backToMenu() {
+  Net.close();
+  mode = 'menu';
+  selected.clear();
+  if (aiTimer) clearTimeout(aiTimer);
+  stopDealing();
+  showEntry();
+}
+
+// 把服务器下发的状态快照写进本地 game 视图模型，然后整屏重画。
+// 本地 game 在联网下不跑任何规则，只当数据容器 + 给 render* 系列读。
+function applySnapshot(snap) {
+  const mySeat = snap.you.seat;
+  netSeat = mySeat;
+  game.humanSeats = new Set([mySeat]);
+  game.humanNames = { [mySeat]: snap.you.name };
+  game.names = snap.names;
+  game.phase = snap.phase;
+  game.levelRank = snap.levelRank;
+  game.levels = snap.levels;
+  game.trumpSuit = snap.trumpSuit;
+  game.dealerSeat = snap.dealerSeat;
+  game.dealerTeam = snap.dealerTeam;
+  game.bidDecidesDealer = snap.bidDecidesDealer;
+  game.firstBidSeat = snap.firstBidSeat;
+  game.mustPlayHurdles = snap.mustPlayHurdles;
+  game.bid = snap.bid;
+  game.leadSeat = snap.leadSeat;
+  // 手牌：只摆自己的，其他三家只留张数（renderSeats 只读 .length）
+  game.hands = snap.handCounts.map(n => new Array(n));
+  game.hands[mySeat] = snap.hand;
+  game.currentTrick = snap.currentTrick;
+  game.lastTrick = snap.lastTrick;
+  game.roundPoints = snap.roundPoints;
+  game.result = snap.result;
+  game.cycleDone = snap.cycleDone;
+  game.taunts = snap.taunts;
+  game.lastThrowFail = snap.lastThrowFail;
+  game.log = snap.logTail || [];
+  bidOptions = snap.bidOptions || [];
+  yourTurn = !!snap.yourTurn;
+  render();
+}
+
 // 5/10/K 必打开关（随时可切，下一轮结算生效）
 $('hurdle-info').addEventListener('click', () => {
+  if (mode === 'net') return;
   game.mustPlayHurdles = !game.mustPlayHurdles;
   render();
 });
@@ -1139,12 +1332,18 @@ $('side-toggle').addEventListener('click', () => {
 
 // 战报栏右上角的「重开」：打到不想玩了可以随时重来
 $('restart').addEventListener('click', () => {
+  if (mode === 'net') { backToMenu(); return; }
   selected.clear();
   clearTaunts();
   game.newGame();
   beginRound();
 });
 
-// 启动
-game.newGame();
-beginRound();
+// 入口按钮：单机 / 联网（测试环境可能没有这些 DOM，判空再绑）
+const btnSolo = $('btn-solo');
+if (btnSolo) btnSolo.addEventListener('click', startSolo);
+const btnNet = $('btn-net');
+if (btnNet) btnNet.addEventListener('click', () => startNet($('net-ip').value, $('net-name').value));
+
+// 启动：先到菜单选单机/联网
+showEntry();

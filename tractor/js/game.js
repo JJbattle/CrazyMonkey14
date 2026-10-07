@@ -83,7 +83,8 @@ const GENTLE_LOSE = [
 
 class Game {
   constructor() {
-    this.humanSeat = 0;
+    this.humanSeats = new Set([0]);   // 真人座位（单机=0；联网=0 和 2 两个对家）
+    this.humanNames = {};             // 真人座位 → 名字（联网时用）
     this.levels = [2, 2];           // 队伍等级：队0(座位0/2)，队1(座位1/3)
     this.dealerTeam = 0;            // 庄家队伍
     this.dealerSeat = 0;            // 庄家座位
@@ -112,6 +113,16 @@ class Game {
 
   teamOf(seat) { return seat % 2; }
 
+  isHuman(seat) { return this.humanSeats.has(seat); }
+
+  // humanSeat 保留成兼容入口：旧代码/旧测试直接赋 0/-1 仍然生效；
+  // 联网时它取第一个真人座位（0），仅用于「无人亮主默认谁坐庄」这类兜底。
+  get humanSeat() {
+    for (const s of [0, 1, 2, 3]) if (this.humanSeats.has(s)) return s;
+    return -1;
+  }
+  set humanSeat(v) { this.humanSeats = new Set(v >= 0 ? [v] : []); }
+
   // 闲家得分的下一个升级节点：80 / 120 / 160 / 200 …（每 40 分一档）
   // 界面过关线、AI 破节点抢分都用它，好让两边对得上。
   scoreTarget(pts) {
@@ -132,11 +143,12 @@ class Game {
   //   另外两家 —— 从陪玩名册里随机抽两个，一局一换
   assignNames() {
     const pool = shuffle(PLAYER_POOL.slice());
-    const partner = (this.humanSeat + 2) % 4;      // 对家 = 隔两个座位的那位
+    const single = this.humanSeats.size === 1;
+    const partner = (this.humanSeat + 2) % 4;      // 单机时对家 = 墩布（隔两个座位）
     this.names = [];
     for (const s of [0, 1, 2, 3]) {
-      if (s === this.humanSeat) this.names[s] = HUMAN_NAME;
-      else if (s === partner) this.names[s] = CAT_NAME;
+      if (this.isHuman(s)) this.names[s] = this.humanNames[s] || HUMAN_NAME;
+      else if (single && s === partner) this.names[s] = CAT_NAME;
       else this.names[s] = pool.pop() || SEAT_CN[s];
     }
     return this.names;
@@ -356,7 +368,7 @@ class Game {
     this.hands[seat].push(card);
     this.dealPos++;
     let aiBid = null;
-    if (seat !== this.humanSeat) {
+    if (!this.isHuman(seat)) {
       aiBid = this.aiBidNow(seat);
       if (aiBid) this.placeBid(seat, aiBid);
     }
@@ -1191,6 +1203,7 @@ class Game {
   // 本局结束的对话：墩布喵喵叫，其他人一律温和鼓励（不嘲讽）
   sayTaunts(winnerTeam) {
     this.taunts = {};
+    if (this.humanSeats.size !== 1) return;   // 联网（两个真人）不播单机猫梗
     if (this.humanSeat < 0) return;
     const pick = a => a[Math.floor(Math.random() * a.length)];
     const mine = this.teamOf(this.humanSeat);
@@ -1213,12 +1226,12 @@ class Game {
   // 执行一步 AI 行动（供 UI 带延迟调用）；返回 true 表示还可能有后续 AI 行动
   aiStep() {
     if (this.phase === 'discard') {
-      if (this.dealerSeat === this.humanSeat) return false;
+      if (this.isHuman(this.dealerSeat)) return false;
       this.doDiscard(this.dealerSeat, this.aiDiscard(this.dealerSeat));
       return true;
     } else if (this.phase === 'playing') {
       const seat = this.currentSeat();
-      if (seat === this.humanSeat) return false;
+      if (this.isHuman(seat)) return false;
       let cards = this.aiPlay(seat);
       if (!this.playCards(seat, cards)) {
         cards = this.fallbackPlay(seat);

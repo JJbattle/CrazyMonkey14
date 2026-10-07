@@ -67,7 +67,8 @@ function ok(name, cond, extra) { if (cond) pass++; else { fail++; console.log('�
 let UID = 0;
 const C = (suit, rank) => ({ uid: 'u' + (UID++), suit, rank });
 
-// ui.js 载入时已经 newGame + beginRound（用假计时器，不会真的跑）
+// ui.js 载入后只显示菜单，不再自动开局——测试里显式选单机模式
+startSolo();
 
 // ---------- 1) 三家只摆一叠卡背 ----------
 {

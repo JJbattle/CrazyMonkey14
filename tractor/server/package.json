@@ -1,0 +1,9 @@
+{
+  "name": "tractor-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "拖拉机联网对战服务器（电脑上跑，手机连它）",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

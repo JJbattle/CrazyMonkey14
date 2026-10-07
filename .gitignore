@@ -11,6 +11,7 @@ king.png
 tractor/app/node_modules/
 tractor/app/www/
 tractor/app/android/
+tractor/server/node_modules/
 
 # ===== 跳棋打包（和拖拉机共用 .toolchain，其余本地产物同样不进 git）=====
 tiaoqi/app/node_modules/

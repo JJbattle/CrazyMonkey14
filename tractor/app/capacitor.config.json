@@ -3,7 +3,7 @@
   "appName": "拖拉机",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "backgroundColor": "#14532d"
   },
   "server": {

@@ -10,6 +10,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="entry">
+    <div class="entry-box">
+      <h1>拖拉机</h1>
+      <button id="btn-solo">单机（和电脑打）</button>
+      <div class="entry-net">
+        <div class="entry-title">联网（两台手机当对家）</div>
+        <input id="net-ip" type="text" inputmode="url" placeholder="电脑 IP，如 192.168.1.73">
+        <input id="net-name" type="text" placeholder="你的名字">
+        <button id="btn-net">联网对战</button>
+      </div>
+      <div id="entry-hint"></div>
+    </div>
+  </div>
   <div id="app">
     <div id="info-bar">
       <div class="info-item" id="dealer-info">坐庄：你（你方）</div>
@@ -104,5 +117,6 @@
   <script src="js/cards.js"></script>
   <script src="js/game.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/net.js"></script>
 </body>
 </html>
