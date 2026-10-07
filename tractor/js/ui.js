@@ -74,10 +74,8 @@ function applyTurnHint() {
   }
 }
 
-// 联网/单机的界面开关：联网时顶栏「重开」变成「退出」，必打不可改
+// 联网/单机的界面开关：必打提示不同。重开按钮文案固定（联网=发起投票，单机=直接重开），不再复用成「退出」。
 function renderMode() {
-  const rb = $('restart');
-  if (rb) rb.textContent = (mode === 'net') ? '退出' : '重开';
   const h = $('hurdle-info');
   if (h) h.title = (mode === 'net') ? '联网时由电脑统一判定，这里不能改' : '随时可切，下一轮结算生效';
 }

@@ -476,6 +476,10 @@ class Game {
     const mark = c => { const k = c.suit + '-' + c.rank; known[k] = (known[k] || 0) + 1; };
     for (const c of this.hands[seat]) mark(c);
     for (const c of this.playedCards) mark(c);
+    // AI 是完美信息：其他三家的手牌也当「已见」。以前这里只统计自己的牌+已出牌，
+    // 把对手手里的强牌也算成「没见」，导致 AI 判断「稳大」时过度保守——明明
+    // 外面已经没更大的牌了，还不敢出大对子/大单张抢分，白白把牌权让出去。
+    for (const s of [0, 1, 2, 3]) if (s !== seat && this.hands[s]) for (const c of this.hands[s]) mark(c);
     const ts = this.trumpSuit, lr = this.levelRank;
     let n = 0;
     for (const c of UNIQUE_DECK) {
