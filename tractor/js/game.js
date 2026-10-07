@@ -22,29 +22,29 @@ const PLAYER_POOL = ['尹天乱', '李淑静', '张文霞', '卢志鸿', '蒋学
 //   思路取自双升常见打法：记牌、稳大优先、控牌调主、将吃时机、甩牌保守等（见需求总纲）。
 const AI_PROFILES = {
   steady: {             // 墩布：最稳最强 —— 敢出对子抢分、将吃有分寸、主特别长才钓光
-    suitPairUnseen: 5,  // 副牌对子/拖拉机：外面至多两对半更大就领出（敢抢分）
-    trumpPairUnseen: 6, // 主牌对子：至多三对更大就领出
+    suitPairUnseen: 1,  // 副牌对子/拖拉机：至多 1 家对手有更大的同型组合就敢领（敢抢分）
+    trumpPairUnseen: 1, // 主牌对子：至多 1 家对手有更大的对子就敢领
     longTrumpMin: 11,   // 主牌 ≥ 11 张（比较长）就主动打主钓光；否则主牌留着将吃副牌
     ruffWithPoints: false, // 没分也能用主将吃抢牌权（主牌留着就是将吃的，充分利用）
     throwMin: 3,        // 甩牌至少 3 张
   },
   sharp: {              // 激进：爱抢分、敢搏大对子、没分也能将吃抢牌权
-    suitPairUnseen: 4,
-    trumpPairUnseen: 6,
+    suitPairUnseen: 1,
+    trumpPairUnseen: 1,
     longTrumpMin: 11,
     ruffWithPoints: false,
     throwMin: 3,
   },
   balanced: {           // 均衡：介于稳健与激进之间
-    suitPairUnseen: 3,
-    trumpPairUnseen: 5,
+    suitPairUnseen: 0,  // 只有没人能压才领出（稳）
+    trumpPairUnseen: 0,
     longTrumpMin: 12,
     ruffWithPoints: true,
     throwMin: 3,
   },
   cautious: {           // 保守：只出绝对稳的牌，少冒险，将吃也最谨慎
-    suitPairUnseen: 1,
-    trumpPairUnseen: 2,
+    suitPairUnseen: 0,
+    trumpPairUnseen: 0,
     longTrumpMin: 13,
     ruffWithPoints: true,
     throwMin: 4,
@@ -512,6 +512,98 @@ class Game {
     return n;
   }
 
+  // 组合级「稳大」：对手（这圈还没出的人）手里能压过 combo 的同型组合个数（0..2，精确）。
+  // 单张 → 更大的单张；对子 → 更大的对子；拖拉机 → 更大的同长同花连对。
+  // unseenStronger 只数「更大的单牌」，拿去判断对子/拖拉机会把「两张更大的散牌」误当威胁、
+  // 又把「一个更大的对子」只当一张——语义全错，所以对子/拖拉机一律走这里。
+  unseenStrongerCombo(combo, cat, seat) {
+    const ts = this.trumpSuit, lr = this.levelRank;
+    const mine = classify(combo, ts, lr);
+    if (!mine) return 0;
+    const played = new Set((this.currentTrick || []).map(p => p.seat));
+    const myTeam = this.teamOf(seat);
+    let n = 0;
+    for (const s of [0, 1, 2, 3]) {
+      if (s === seat || played.has(s) || this.teamOf(s) === myTeam) continue;
+      const pool = (this.hands[s] || []).filter(c => catOf(c, ts, lr) === cat);
+      if (this.findBeatingCombo(pool, mine, ts, lr)) n++;
+    }
+    return n;
+  }
+
+  // 在 pool（同门牌）里找一组能压过 mine 的同型组合；没有返回 null。
+  // mine 是 classify 的结果，mine.key 就是这组的强度。
+  findBeatingCombo(pool, mine, ts, lr) {
+    if (!mine) return null;
+    const mineP = mine.key;
+    if (mine.type === 'single') {
+      for (const c of pool) if (power(c, ts, lr) > mineP) return [c];
+      return null;
+    }
+    const g = {};
+    for (const c of pool) { const k = c.suit + '-' + c.rank; (g[k] = g[k] || []).push(c); }
+    if (mine.type === 'pair') {
+      for (const k in g) if (g[k].length >= 2 && power(g[k][0], ts, lr) > mineP) return g[k].slice(0, 2);
+      return null;
+    }
+    // 拖拉机：同花色、连续 mine.len 个对子，且顶对 power 更高（不含王/级牌）
+    const pr = [];
+    for (const k in g) {
+      if (g[k].length < 2) continue;
+      const c0 = g[k][0];
+      if (isJoker(c0) || c0.rank === lr) continue;
+      pr.push({ rank: c0.rank, suit: c0.suit, cards: g[k].slice(0, 2) });
+    }
+    pr.sort((a, b) => a.suit - b.suit || a.rank - b.rank);
+    for (let i = 0; i + mine.len <= pr.length; i++) {
+      let ok = true;
+      for (let j = 1; j < mine.len; j++) {
+        if (pr[i + j].suit !== pr[i + j - 1].suit || pr[i + j].rank - pr[i + j - 1].rank !== 1) { ok = false; break; }
+      }
+      if (!ok) continue;
+      if (power(pr[i + mine.len - 1].cards[0], ts, lr) > mineP) {
+        const cards = [];
+        for (let j = 0; j < mine.len; j++) cards.push(...pr[i + j].cards);
+        return cards;
+      }
+    }
+    return null;
+  }
+
+  // 一组牌要凑出的「组张数」（判断空门将吃需要什么主牌结构用）
+  shapeSizesOf(leadOrCards) {
+    const ts = this.trumpSuit, lr = this.levelRank;
+    const info = leadOrCards && leadOrCards.type ? leadOrCards : classify(leadOrCards, ts, lr);
+    if (!info) return [1];
+    if (info.type === 'single') return [1];
+    if (info.type === 'pair') return [2];
+    if (info.type === 'tractor') return [info.len * 2];
+    if (info.type === 'throw') return info.comps.map(c => c.length).sort((a, b) => b - a);
+    return [1];
+  }
+
+  // 有没有对手能「空门将吃」这一门（cat='suit:N'）。返回座位号，没有返回 -1。
+  // 主牌领出不可能被将吃（cat==='trump' 直接 -1）。shapeSizes 见 shapeSizesOf。
+  canOpponentRuff(seat, cat, shapeSizes) {
+    if (cat === 'trump') return -1;
+    const ts = this.trumpSuit, lr = this.levelRank;
+    const played = new Set((this.currentTrick || []).map(p => p.seat));
+    const myTeam = this.teamOf(seat);
+    for (const s of [0, 1, 2, 3]) {
+      if (s === seat || played.has(s) || this.teamOf(s) === myTeam) continue;
+      if ((this.hands[s] || []).some(c => catOf(c, ts, lr) === cat)) continue; // 有这门，不能将吃
+      if (canTakeShape((this.hands[s] || []).filter(c => isTrump(c, ts, lr)), shapeSizes, ts, lr)) return s;
+    }
+    return -1;
+  }
+
+  // 跟牌时：后面还没出的对手会不会用「更大的同型组合」或「空门将吃」压掉我这一组。
+  safeFromLaterOpponents(combo, lead, leadCat, seat) {
+    if (this.canOpponentRuff(seat, leadCat, this.shapeSizesOf(lead)) >= 0) return false;
+    if (lead.type === 'throw') return true; // 甩牌跟牌只有将吃能破，同门再大也不算
+    return this.unseenStrongerCombo(combo, leadCat, seat) === 0;
+  }
+
   // 从 catCards 里生成符合 lead 形状的候选组合，按强度升序
   catCandidates(catCards, lead) {
     const ts = this.trumpSuit, lr = this.levelRank;
@@ -797,10 +889,9 @@ class Game {
       const wins = this.winningFollows(seat, catCards, lead);
       if (wins.length) {
         if (lastToPlay) return this.mostPoints(wins);
-        // 不是最后一家：新 unseenStronger 精确数「后面还没出的对手手里的更大牌」。
-        // 只有 0（绝对稳）才抢；有 1 张更大的都会被压，不赌，垫掉。
-        // （第三名尤其要权衡第四名手里更大的牌，别把中牌扔进会被压的圈。）
-        const safe = wins.filter(w => this.unseenStronger(w[0], leadCat, seat) === 0);
+        // 不是最后一家：只有「后面还没出的对手」既没有更大的同型组合、也没人能空门将吃，
+        // 才算绝对稳，才抢；否则垫掉，别把中牌扔进会被压/被毙的圈。
+        const safe = wins.filter(w => this.safeFromLaterOpponents(w, lead, leadCat, seat));
         if (safe.length) return safe[0];
       }
       // 抢不稳：看还没出的队友手里有没有该门「对手压不住」的顶牌，
@@ -970,7 +1061,7 @@ class Game {
     const big = hand.filter(c => c.rank === 17);
     if (big.length >= 2) return big.slice(0, 2);
     const small = hand.filter(c => c.rank === 16);
-    if (small.length >= 2 && this.unseenStronger({ suit: 4, rank: 16 }, 'trump', seat) === 0) {
+    if (small.length >= 2 && this.unseenStrongerCombo(small.slice(0, 2), 'trump', seat) === 0) {
       return small.slice(0, 2);
     }
     return null;
@@ -1025,7 +1116,9 @@ class Game {
       const theirs = ph.filter(c => c.suit === s && !isTrump(c, ts, lr));
       if (!theirs.length) continue;
       const top = theirs.slice().sort((a, b) => power(b, ts, lr) - power(a, ts, lr))[0];
-      if (!oppCanBeat('suit:' + s, top)) return [this.lowestCard(mine, ts, lr)];
+      if (!oppCanBeat('suit:' + s, top) && this.canOpponentRuff(seat, 'suit:' + s, [1]) < 0) {
+        return [this.lowestCard(mine, ts, lr)];
+      }
     }
 
     // 2) 主：对家有大主（级牌/王），我吊最小主让对家用大主压
@@ -1043,9 +1136,9 @@ class Game {
     return null;
   }
 
-  // 领出副牌顶牌单张 A（同门最大、绝对稳大）抢分。
-  // 只认 rank 14（A）：更小的单张即便「外面暂时没有更大的」也只是小牌，
-  // 领出去抢不到分、还把牌权白送；只有 A 才值得主动领出，逼出该门的 K/10 分牌。
+  // 领出副牌顶牌单张抢分：对手压不住（unseenStronger===0）且无人空门将吃，就是有效顶牌。
+  // 不再写死 A——完美信息下 A 都出光、K 就是顶牌；A/K 都出光、Q 也是；
+  // Q 以下太弱（逼不出分、也谈不上控制），不值得主动领出，所以 Q 兜底。
   leadTopSingle(seat, hand) {
     const ts = this.trumpSuit, lr = this.levelRank;
     const suits = [0, 1, 2, 3].filter(s => ts == null || ts < 0 || s !== ts);
@@ -1053,9 +1146,11 @@ class Game {
     for (const s of suits) {
       const cs = hand.filter(c => c.suit === s && !isTrump(c, ts, lr));
       if (!cs.length) continue;
-      const top = cs.filter(c => c.rank === 14 && this.unseenStronger(c, 'suit:' + s, seat) === 0)
-                    .sort((a, b) => power(b, ts, lr) - power(a, ts, lr))[0];
-      if (top && (!best || power(top, ts, lr) > power(best, ts, lr))) best = top;
+      const top = cs.slice().sort((a, b) => power(b, ts, lr) - power(a, ts, lr))[0];
+      if (top.rank < 12) continue;                          // 只领 Q/K/A 这种像样的顶牌
+      if (this.unseenStronger(top, 'suit:' + s, seat) !== 0) continue;
+      if (this.canOpponentRuff(seat, 'suit:' + s, [1]) >= 0) continue;
+      if (!best || power(top, ts, lr) > power(best, ts, lr)) best = top;
     }
     return best ? [best] : null;
   }
@@ -1082,18 +1177,20 @@ class Game {
         if (run.length > bestRun.length) bestRun = run.slice();
       }
       if (bestRun.length >= 2) {
-        const top = g[bestRun[bestRun.length - 1]][0];
-        // 外面至多「一对」更大的牌没见过 → 值得一搏（阈值看打法）
-        if (this.unseenStronger(top, cat, seat) <= p.suitPairUnseen) {
-          const cards = [];
-          for (const r of bestRun) cards.push(...g[r].slice(0, 2));
+        const cards = [];
+        for (const r of bestRun) cards.push(...g[r].slice(0, 2));
+        // 对手没有更大的同长拖拉机、也无人空门将吃，才敢领（阈值看打法）
+        if (this.unseenStrongerCombo(cards, cat, seat) <= p.suitPairUnseen &&
+            this.canOpponentRuff(seat, cat, this.shapeSizesOf(cards)) < 0) {
           if (!bestTractor || cards.length > bestTractor.length) bestTractor = cards;
         }
       }
       for (let i = ranks.length - 1; i >= 0; i--) {
         const pc = g[ranks[i]][0];
-        if (this.unseenStronger(pc, cat, seat) <= p.suitPairUnseen) {
-          if (!bestPair || power(pc, ts, lr) > power(bestPair[0], ts, lr)) bestPair = g[ranks[i]].slice(0, 2);
+        const pair = g[ranks[i]].slice(0, 2);
+        if (this.unseenStrongerCombo(pair, cat, seat) <= p.suitPairUnseen &&
+            this.canOpponentRuff(seat, cat, this.shapeSizesOf(pair)) < 0) {
+          if (!bestPair || power(pc, ts, lr) > power(bestPair[0], ts, lr)) bestPair = pair;
           break;
         }
       }
@@ -1115,7 +1212,7 @@ class Game {
     for (const k in tg) {
       if (tg[k].length < 2) continue;
       const c = tg[k][0];
-      if (this.unseenStronger(c, 'trump', seat) > p.trumpPairUnseen) continue;
+      if (this.unseenStrongerCombo(tg[k].slice(0, 2), 'trump', seat) > p.trumpPairUnseen) continue;
       if (!best || power(c, ts, lr) > power(best[0], ts, lr)) best = tg[k].slice(0, 2);
     }
     return best;
