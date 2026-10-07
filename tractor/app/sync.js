@@ -1,9 +1,9 @@
-// 把 ../tractor 的网页版原样搬进 app/www，供 Capacitor 打进 APK。
-// 改完网页版（tractor/ 里的东西）以后重新跑一次 npm run sync-web 就行。
+// 把 ../ 的网页版原样搬进 app/www，供 Capacitor 打进 APK。
+// 改完网页版（本目录上一层的拖拉机网页版）以后重新跑一次 npm run sync-web 就行。
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.resolve(__dirname, '..', 'tractor');
+const SRC = path.resolve(__dirname, '..');
 const DST = path.resolve(__dirname, 'www');
 
 // 只搬运行真正需要的东西，tests/ 不进去

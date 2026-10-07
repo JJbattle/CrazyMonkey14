@@ -3,21 +3,23 @@
 king.png
 截图/
 
-# ===== Android 打包：工具链、依赖、产物（本地可重建，不进 git）=====
-app/.toolchain/
-app/node_modules/
-app/www/
-app/android/
-app/*.apk
+# ===== 共享工具链（本地可重建，不进 git）=====
+.toolchain/
 
-# ===== 跳棋打包（和拖拉机共用 app/.toolchain，其余本地产物同样不进 git）=====
+# ===== Android 打包：依赖、产物（本地可重建，不进 git）=====
+tractor/app/node_modules/
+tractor/app/www/
+tractor/app/android/
+tractor/app/*.apk
+
+# ===== 跳棋打包（和拖拉机共用 .toolchain，其余本地产物同样不进 git）=====
 tiaoqi/app/node_modules/
 tiaoqi/app/www/
 tiaoqi/app/android/
 tiaoqi/app/*.apk
 tiaoqi/app/build-log.txt
 
-# ===== 蜘蛛纸牌打包（同样共用 app/.toolchain，本地产物不进 git）=====
+# ===== 蜘蛛纸牌打包（同样共用 .toolchain，本地产物不进 git）=====
 zhizhu/app/node_modules/
 zhizhu/app/www/
 zhizhu/app/android/

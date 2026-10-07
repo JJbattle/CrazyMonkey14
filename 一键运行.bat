@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-set "APP=%~dp0app"
-set "ADB=%APP%\.toolchain\android-sdk\platform-tools\adb.exe"
+set "APP=%~dp0tractor\app"
+set "ADB=%~dp0.toolchain\android-sdk\platform-tools\adb.exe"
 set "PKG=com.crazymonkey.tractor"
 
 echo.

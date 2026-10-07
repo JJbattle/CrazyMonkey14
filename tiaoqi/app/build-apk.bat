@@ -7,20 +7,20 @@ echo   跳棋 APK 打包
 echo ============================================
 echo.
 
-rem ---- 工具链和拖拉机共用 ../../app/.toolchain，不占 C 盘、不重复占盘 ----
-set "JAVA_HOME=%~dp0..\..\app\.toolchain\jdk-21.0.12.1+1"
-set "ANDROID_HOME=%~dp0..\..\app\.toolchain\android-sdk"
-set "GRADLE_USER_HOME=%~dp0..\..\app\.toolchain\gradle-home"
+rem ---- 工具链和拖拉机共用 ../../.toolchain，不占 C 盘、不重复占盘 ----
+set "JAVA_HOME=%~dp0..\..\.toolchain\jdk-21.0.12.1+1"
+set "ANDROID_HOME=%~dp0..\..\.toolchain\android-sdk"
+set "GRADLE_USER_HOME=%~dp0..\..\.toolchain\gradle-home"
 
 if not exist "%JAVA_HOME%\bin\java.exe" (
   echo [错误] 找不到 Java：%JAVA_HOME%
-  echo        请确认 ..\..\app\.toolchain 还在。
+  echo        请确认 ..\..\.toolchain 还在。
   pause
   exit /b 1
 )
 if not exist "%ANDROID_HOME%\platforms\android-36" (
   echo [错误] 找不到安卓 SDK：%ANDROID_HOME%
-  echo        请确认 ..\..\app\.toolchain\android-sdk 还在。
+  echo        请确认 ..\..\.toolchain\android-sdk 还在。
   pause
   exit /b 1
 )
