@@ -115,7 +115,9 @@ function gWith(trumpSuit, levelRank, hands, plays) {
 
 // ===== P0-4 喂对家也检查将吃 =====
 
-// —— 8) 对家有顶牌，但对手空门能毙 → 不喂这门，改走别的 ——
+// —— 8) 对家有顶牌，但对手空门能毙 → 不喂这门（直接锁 leadForPartner 的「不喂」） ——
+// 注：P0-B-1 之后 aiLead 兜底会改领红桃4「造空门」（非分、不送分），那是另一件事；
+// 这里只锁 P0-A 的语义——喂对家会被将吃时，leadForPartner 绝不喂红桃4。
 {
   const g = gWith(3, 2, [
     [mk(1, 3, 5)],                           // 对手0：空门红桃，有方块5(主)能毙
@@ -123,8 +125,7 @@ function gWith(trumpSuit, levelRank, hands, plays) {
     [],                                      // 对手2：空
     [mk(6, 1, 14)],                          // 对家3：红桃A（顶牌）
   ]);
-  const out = g.aiLead(1);
-  ok('喂对家会被将吃 → 不领红桃4喂对家', !(out.length === 1 && out[0].suit === 1 && out[0].rank === 4));
+  ok('喂对家会被将吃 → leadForPartner 不喂红桃4', g.leadForPartner(1, g.hands[1]) === null);
 }
 `;
 

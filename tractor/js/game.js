@@ -412,9 +412,29 @@ class Game {
   }
 
   // ---------- 扣底 ----------
+  // 保底控制强弱（完美信息，只看庄家方 vs 闲家方的主牌控制结构）。
+  // 主牌张数 + 级牌/王（power≥970）对比，给三个离散档位，供 aiDiscard 决定埋分力度。
+  // 不是精确预测整局，只是避免「明显控不住底 + 底分又高」还继续往底里埋 K/10/5。
+  bottomProtection(seat) {
+    const ts = this.trumpSuit, lr = this.levelRank;
+    const stat = seats => {
+      let n = 0, big = 0;
+      for (const s of seats) for (const c of (this.hands[s] || [])) {
+        if (isTrump(c, ts, lr)) { n++; if (power(c, ts, lr) >= 970) big++; }
+      }
+      return { n, big };
+    };
+    const my = stat([seat, (seat + 2) % 4]);                // 庄家方
+    const their = stat([(seat + 1) % 4, (seat + 3) % 4]);   // 闲家方
+    if (my.big > their.big && my.n >= their.n) return 'strong';  // 级牌/王和总主都占优
+    if (their.big > my.big && their.n > my.n) return 'weak';      // 级牌/王和总主都被压
+    return 'neutral';
+  }
+
   aiDiscard(seat) {
     const hand = this.hands[seat].slice();
     const ts = this.trumpSuit, lr = this.levelRank;
+    const prot = this.bottomProtection(seat);
     // 扣底优先级：副牌非分、低、且出自短门（造空门）优先扣；主牌/王/级牌/分牌尽量留
     const cut = c => {
       let s = 0;
@@ -426,22 +446,33 @@ class Game {
       return s;
     };
 
-    // 第一轮：短门（副牌 ≤2 张）里的分牌优先扣。短门本来就打不出对子/拖拉机，
-    // 留着分牌之后会被对手一吊这门就裸送分，先清掉。（孤张大牌这里不单独扣：
-    // 孤 K 本就是分牌已被覆盖，孤 A 是顶牌留着抢分有用，孤 Q/J 收益小。）
     const out = [];
     const byCat = {};
     for (const c of hand) { const k = catOf(c, ts, lr); (byCat[k] = byCat[k] || []).push(c); }
-    for (const k in byCat) {
-      if (k === 'trump' || byCat[k].length > 2) continue;
-      for (const c of byCat[k]) {
-        if (out.length >= 8) break;
-        if (pointValue(c) > 0) out.push(c);
+
+    // 强保底：短门（副牌 ≤2 张）分牌优先埋——底控得住，积极埋分造缺、清掉烫手分牌。
+    if (prot === 'strong') {
+      for (const k in byCat) {
+        if (k === 'trump' || byCat[k].length > 2) continue;
+        for (const c of byCat[k]) {
+          if (out.length >= 8) break;
+          if (pointValue(c) > 0) out.push(c);
+        }
       }
     }
-    // 第二轮：剩余名额照原 cut 贪心补齐到 8 张
+
+    // 补齐剩余名额：弱保底时非分牌优先（不往底里埋分，免得被抠底翻倍），
+    // 其余（强/中性）照原 cut 贪心。
     const used = new Set(out.map(c => c.uid));
-    const rest = hand.filter(c => !used.has(c.uid)).sort((a, b) => cut(b) - cut(a));
+    let rest = hand.filter(c => !used.has(c.uid));
+    if (prot === 'weak') {
+      const junk = rest.filter(c => pointValue(c) === 0).sort((a, b) => cut(b) - cut(a));
+      for (const c of junk) { if (out.length >= 8) break; out.push(c); }
+      const used2 = new Set(out.map(c => c.uid));
+      rest = hand.filter(c => !used2.has(c.uid)).sort((a, b) => cut(b) - cut(a));
+    } else {
+      rest = rest.sort((a, b) => cut(b) - cut(a));
+    }
     for (const c of rest) { if (out.length >= 8) break; out.push(c); }
     return out.slice(0, 8);
   }
@@ -869,9 +900,10 @@ class Game {
     const pts = this.trickPoints();
     const amDealer = this.teamOf(seat) === this.dealerTeam;
 
-    // 对手赢着、闲家得分马上破节点时：果断下大王抢牌权（跟主牌下王 / 将吃下王）
+    // 对手赢着时看节点：闲家破节点抢牌权（clutchGrab），庄家方守节点拦分（nodeGrab）。
+    // 都是确定性判断——只有「拆结构确定能赢/能拦」才动手，不建立任何权重系统。
     if (!partnerWinning) {
-      const grab = this.clutchGrab(seat, hand, lead, leadCat);
+      const grab = this.clutchGrab(seat, hand, lead, leadCat) || this.nodeGrab(seat, hand, lead, leadCat);
       if (grab) return grab;
     }
 
@@ -921,6 +953,24 @@ class Game {
     const big = trumps.filter(c => c.rank === 17)[0] || trumps.filter(c => c.rank === 16)[0];
     if (!big) return null;
     if (!this.wouldWin(seat, [big])) return null;            // 压不住就别硬上
+    return [big];
+  }
+
+  // 庄家方守节点：闲家这一圈的分若被拿去就会跨 80/120/160/200，即便要拆对王，
+  // 也果断用大王把这一圈抢下来（大王绝对最大，确定能拦住）。与 clutchGrab 互为镜像：
+  // clutchGrab 是闲家抢着过节点，这里庄家抢着拦节点。
+  nodeGrab(seat, hand, lead, leadCat) {
+    if (this.teamOf(seat) !== this.dealerTeam) return null;  // 只有庄家方守节点
+    const target = this.scoreTarget(this.roundPoints);
+    if (this.roundPoints + this.trickPoints() < target) return null; // 这圈分不够跨节点，不拆
+    if (lead.type !== 'single') return null;                 // 只抢单张（对子/拖拉机拆王太亏）
+    const ts = this.trumpSuit, lr = this.levelRank;
+    const haveLeadCat = hand.some(c => catOf(c, ts, lr) === leadCat);
+    if (leadCat !== 'trump' && haveLeadCat) return null;     // 有本门必须跟本门，王派不上
+    const trumps = hand.filter(c => isTrump(c, ts, lr));
+    const big = trumps.filter(c => c.rank === 17)[0] || trumps.filter(c => c.rank === 16)[0];
+    if (!big) return null;
+    if (!this.wouldWin(seat, [big])) return null;            // 压不住就别硬上（几乎不会发生）
     return [big];
   }
 
@@ -978,6 +1028,10 @@ class Game {
     const p = this.profileOf(seat);
     // 主特别长（能把对手的主一波钓光）才主动打主；否则主牌留着将吃副牌
     const longTrump = trumps.length >= p.longTrumpMin;
+    // 残局（还剩 ≤3 墩）：庄家/闲家都要把「能保底/抠底的关键主牌」留到最后一墩，
+    // 不在倒数第 2、3 墩提前打掉。王、主级牌对、主拖拉机是最后一墩定乾坤的牌，
+    // 现在领出去就是提前消耗。节点抢牌（clutchGrab/nodeGrab）是跟牌侧的，不受这里影响。
+    const endgame = hand.length <= 3;
 
     // 甩牌：同门有多组绝对压得住的牌 → 一把甩出去。主牌不甩（留着将吃副牌）
     const thr = this.aiThrow(seat, hand);
@@ -985,7 +1039,7 @@ class Game {
 
     // 小心眼儿①：无主（无将）打 5/10/K 这种「级牌就是分牌」的局，
     // 上手就对王钓主——逼对手把级牌（5/10/K）跟出来，一把吃分。
-    if (ts === -1 && pointValue({ rank: lr, suit: 0 }) > 0) {
+    if (!endgame && ts === -1 && pointValue({ rank: lr, suit: 0 }) > 0) {
       const jp = this.jokerPairLead(seat, hand);
       if (jp) return jp;
     }
@@ -1009,7 +1063,7 @@ class Game {
     // 会把主牌大牌白白浪费，副牌没人管，牌权一丢就收不回来（玩家专门点过这毛病）。
     // 主牌不长（对王抢牌权是合理的）、或副牌全打空之后，才照常打主对子 / 吊主钓光。
     const hasOffSuit = hand.some(c => !isTrump(c, ts, lr));
-    if (!(longTrump && hasOffSuit)) {
+    if (!endgame && !(longTrump && hasOffSuit)) {
       // 副牌没大牌了，打主对子抢牌权（对王/对级牌/对主 A）——这是「抢牌权」不是「钓主」，
       // 对王这种顶级对子出了稳赢、留着将吃的机会反而少，主动出更值
       const tp = this.leadTrumpCombo(seat, hand);
@@ -1029,17 +1083,35 @@ class Game {
     const feed = this.leadForPartner(seat, hand);
     if (feed) return feed;
 
-    // 兜底：优先甩掉短门里的分牌（烫手，先处理免得之后被吊出来送分），
-    // 没有短门分牌，才从短门出最低的非分副牌单张，造空门，以后好将吃。
+    // 兜底：短门先出「非分低牌」造空门；短门分牌只有在完美信息确定安全
+    // （没人能压 + 没人能毙）才领出去处理。以前这里无脑优先甩短门分牌，
+    // 等于把敌方可能拿到的 K/10/5 主动领出去送分，现在反过来。
     const nonTrump = hand.filter(c => !isTrump(c, ts, lr));
     const byCat = {};
     for (const c of nonTrump) { const k = catOf(c, ts, lr); (byCat[k] = byCat[k] || []).push(c); }
+
+    // 1) 短门非分低牌 → 造空门（首选）
+    let shortJunk = null;
+    for (const k in byCat) {
+      if (byCat[k].length > 2) continue;
+      const jk = byCat[k].filter(c => pointValue(c) === 0)
+                         .sort((a, b) => power(a, ts, lr) - power(b, ts, lr));
+      if (jk.length && (!shortJunk || power(jk[0], ts, lr) < power(shortJunk, ts, lr))) shortJunk = jk[0];
+    }
+    if (shortJunk) return [shortJunk];
+
+    // 2) 短门分牌：只在确定安全时领（否则留着，别把可能被拿的分主动送出去）
     let shortPoint = null;
     for (const k in byCat) {
       if (byCat[k].length > 2) continue;
       const pt = byCat[k].filter(c => pointValue(c) > 0)
                            .sort((a, b) => power(a, ts, lr) - power(b, ts, lr));
-      if (pt.length && (!shortPoint || power(pt[0], ts, lr) < power(shortPoint, ts, lr))) shortPoint = pt[0];
+      if (!pt.length) continue;
+      const c = pt[0];
+      const cat = 'suit:' + c.suit;
+      if (this.unseenStronger(c, cat, seat) === 0 && this.canOpponentRuff(seat, cat, [1]) < 0) {
+        if (!shortPoint || power(c, ts, lr) < power(shortPoint, ts, lr)) shortPoint = c;
+      }
     }
     if (shortPoint) return [shortPoint];
 
